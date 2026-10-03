@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Профиль — AI Tools Hub</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Unbounded:wght@500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="bg-orbs">
+        <div class="orb orb-1"></div>
+        <div class="orb orb-2"></div>
+        <div class="orb orb-3"></div>
+    </div>
+
+    <header class="header">
+        <nav class="nav container">
+            <a href="index.html" class="logo">AI<span>Tools</span>Hub</a>
+            <div style="display:flex;gap:10px;align-items:center">
+                <select class="theme-select" id="themeSelect" title="Тема">
+                    <option value="auto">Авто</option>
+                    <option value="dark">Тёмная</option>
+                    <option value="light">Светлая</option>
+                </select>
+                <a href="index.html" class="btn-ghost">← Главная</a>
+            </div>
+        </nav>
+    </header>
+
+    <main class="container section">
+        <h2 class="section-title">Мой профиль</h2>
+        <div id="profileBox" class="card glass" style="max-width:600px;padding:32px">
+            <p style="color:var(--muted)">Загрузка...</p>
+        </div>
+    </main>
+
+    <footer class="footer"><p>© 2026 AI Tools Hub</p></footer>
+    <script src="theme.js"></script>
+    <script src="bg.js"></script>
+    <script>
+        fetch('/api/me', { credentials: 'same-origin' })
+            .then(r => r.ok ? r.json() : Promise.reject())
+            .then(({ user }) => {
+                document.getElementById('profileBox').innerHTML = `
+                    <div style="display:flex;align-items:center;gap:20px;margin-bottom:24px">
+                        ${user.avatar ? `<img src="${user.avatar}" class="avatar" style="width:64px;height:64px" id="avatarImg">` : `<div class="avatar-initial" style="width:64px;height:64px;font-size:1.6rem" id="avatarImg">${user.username[0].toUpperCase()}</div>`}
+                        <div>
+                            <h3 style="font-size:1.4rem">${user.username}</h3>
+                            <p style="color:var(--muted)">${user.email}</p>
+                        </div>
+                    </div>
+                    <p style="color:var(--muted)">Дата регистрации: ${new Date(user.created_at).toLocaleDateString('ru-RU')}</p>
+                    <p style="color:var(--muted)">ID пользователя: #${user.id}</p>
+                    <div style="margin-top:20px">
+                        <p style="margin-bottom:8px">Аватар:</p>
+                        <input type="file" id="avatarInput" accept="image/*" style="color:var(--muted)">
+                        <p id="avatarMsg" style="color:var(--muted);font-size:.85rem;min-height:1.2em"></p>
+                    </div>
+                    <button class="btn-ghost" style="margin-top:20px" onclick="logout()">Выйти из аккаунта</button>
+                `;
+                document.getElementById('avatarInput').addEventListener('change', e => {
+                    const file = e.target.files[0];
+                    if (!file) return;
+                    if (file.size > 1.2 * 1024 * 1024) {
+                        document.getElementById('avatarMsg').textContent = 'Файл слишком большой (макс 1.2 МБ)';
+                        return;
+                    }
+                    const reader = new FileReader();
+                    reader.onload = async () => {
+                        const res = await fetch('/api/avatar', {
+                            method: 'POST', credentials: 'same-origin',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ avatar: reader.result }),
+                        });
+                        document.getElementById('avatarMsg').textContent = res.ok ? 'Аватар обновлён ✓' : 'Ошибка загрузки';
+                        if (res.ok) {
+                            const img = document.createElement('img');
+                            img.id = 'avatarImg'; img.src = reader.result; img.className = 'avatar'; img.style.width = '64px'; img.style.height = '64px';
+                            document.getElementById('avatarImg').replaceWith(img);
+                        }
+                    };
+                    reader.readAsDataURL(file);
+                });
+            })
+            .catch(() => {
+                document.getElementById('profileBox').innerHTML = '<p>Вы не авторизованы. <a href="index.html" style="color:var(--accent2)">Войти</a></p>';
+            });
+
+        fetch('/api/favorites', { credentials: 'same-origin' }).then(r => r.ok ? r.json() : null).then(data => {
+            if (!data) return;
+            const box = document.createElement('div');
+            box.style.marginTop = '24px';
+            box.innerHTML = '<h3 style="margin-bottom:12px">Избранные инструменты</h3>' +
+                (data.favorites.length
+                    ? data.favorites.map(t => `<a href="tool.html?id=${t.id}" style="display:inline-block;margin:0 8px 8px 0;padding:8px 16px;border-radius:50px;text-decoration:none;color:var(--text);background:var(--card);border:1px solid var(--border)">${t.name} ★ ${t.rating}</a>`).join('')
+                    : '<p style="color:var(--muted)">Пока пусто — добавляйте сердечком на странице инструмента.</p>');
+            document.getElementById('profileBox').appendChild(box);
+        });
+
+        function logout() {
+            fetch('/api/logout', { method: 'POST', credentials: 'same-origin' })
+                .then(() => location.href = 'index.html');
+        }
+    </script>
+</body>
+</html>

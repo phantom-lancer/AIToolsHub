@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Инструмент — AI Tools Hub</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Unbounded:wght@500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="bg-orbs">
+        <div class="orb orb-1"></div>
+        <div class="orb orb-2"></div>
+        <div class="orb orb-3"></div>
+    </div>
+
+    <header class="header">
+        <nav class="nav container">
+            <a href="index.html" class="logo">AI<span>Tools</span>Hub</a>
+            <div style="display:flex;gap:10px;align-items:center">
+                <select class="theme-select" id="themeSelect" title="Тема">
+                    <option value="auto">Авто</option>
+                    <option value="dark">Тёмная</option>
+                    <option value="light">Светлая</option>
+                </select>
+                <a href="index.html#catalog" class="btn-ghost">← К каталогу</a>
+            </div>
+        </nav>
+    </header>
+
+    <main class="container section">
+        <div id="toolPage"></div>
+    </main>
+
+    <footer class="footer"><p>© 2026 AI Tools Hub</p></footer>
+    <script src="theme.js"></script>
+    <script src="bg.js"></script>
+    <script>
+        const categoryNames = { text: 'Текст', code: 'Код', art: 'Арт', video: 'Видео' };
+        const id = new URLSearchParams(location.search).get('id');
+        let myRating = 0;
+
+        function starsHtml(value) {
+            return [1,2,3,4,5].map(v => `<span data-v="${v}" class="${v <= value ? 'on' : ''}">★</span>`).join('');
+        }
+
+        function renderStars() {
+            document.getElementById('stars').innerHTML = starsHtml(myRating);
+        }
+
+        async function load() {
+            const res = await fetch('/api/tools/' + id, { credentials: 'same-origin' });
+            if (!res.ok) {
+                document.getElementById('toolPage').innerHTML = '<p class="empty">Инструмент не найден.</p>';
+                return;
+            }
+            const { tool, ratingsCount, userAvg, comments, myRating: mr, isFavorite } = await res.json();
+            myRating = mr;
+            document.title = tool.name + ' — AI Tools Hub';
+            document.getElementById('toolPage').innerHTML = `
+                <div class="card glass" style="max-width:760px;margin:0 auto;padding:36px">
+                    <span class="card-badge badge-${tool.category}">${categoryNames[tool.category]}</span>
+                    <h1 style="font-family:'Unbounded';margin-bottom:16px">${tool.name}</h1>
+                    <p style="color:var(--muted);margin-bottom:20px">${tool.desc}</p>
+                    <p class="card-rating" style="font-size:1.3rem">★ ${userAvg ?? tool.rating} / 5 <small style="color:var(--muted);font-size:.9rem">(${ratingsCount} оценок)</small></p>
+                    <button class="btn-ghost" id="favBtn" style="margin-left:12px">${isFavorite ? '♥ В избранном' : '♡ В избранное'}</button>
+                    <div style="margin:24px 0">
+                        <p style="margin-bottom:8px">Ваша оценка:</p>
+                        <div class="stars" id="stars"></div>
+                        <p id="rateMsg" style="color:var(--muted);font-size:.85rem;min-height:1.2em"></p>
+                    </div>
+                    <hr style="border-color:var(--border);margin:24px 0">
+                    <h3 style="margin-bottom:12px">Комментарии (${comments.length})</h3>
+                    <textarea class="commentInput" id="commentInput" placeholder="Поделитесь впечатлением..." maxlength="500"></textarea>
+                    <button class="btn-primary-sm" id="sendComment" style="margin-top:10px">Отправить</button>
+                    <p id="commentMsg" style="color:var(--muted);font-size:.85rem;min-height:1.2em"></p>
+                    <div id="commentsList">
+                        ${comments.map(c => `
+                            <div class="comment">
+                                ${c.avatar ? `<img src="${c.avatar}" class="avatar">` : `<div class="avatar-initial">${c.username[0].toUpperCase()}</div>`}
+                                <div>
+                                    <b>${c.username}</b> <small style="color:var(--muted)">${new Date(c.created_at).toLocaleString('ru-RU')}</small>
+                                    <p>${c.text.replace(/</g, '&lt;')}</p>
+                                </div>
+                            </div>
+                        `).join('') || '<p style="color:var(--muted)">Пока нет комментариев — будьте первым!</p>'}
+                    </div>
+                </div>
+            `;
+            renderStars();
+
+            document.getElementById('favBtn').addEventListener('click', async () => {
+                const res = await fetch('/api/tools/' + id + '/favorite', { method: 'POST', credentials: 'same-origin' });
+                const data = await res.json();
+                if (res.ok) document.getElementById('favBtn').textContent = data.favorite ? '♥ В избранном' : '♡ В избранное';
+                else document.getElementById('favBtn').textContent = 'Войдите, чтобы добавить';
+            });
+
+            document.getElementById('stars').addEventListener('click', async e => {
+                const s = e.target.closest('span');
+                if (!s) return;
+                const value = Number(s.dataset.v);
+                const res = await fetch('/api/tools/' + id + '/rate', {
+                    method: 'POST', credentials: 'same-origin',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ value }),
+                });
+                const data = await res.json();
+                const msg = document.getElementById('rateMsg');
+                if (res.ok) { myRating = value; renderStars(); msg.textContent = 'Оценка сохранена ✓'; }
+                else msg.textContent = data.error || 'Ошибка';
+            });
+
+            document.getElementById('sendComment').addEventListener('click', async () => {
+                const input = document.getElementById('commentInput');
+                const msg = document.getElementById('commentMsg');
+                const res = await fetch('/api/tools/' + id + '/comment', {
+                    method: 'POST', credentials: 'same-origin',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text: input.value }),
+                });
+                const data = await res.json();
+                if (res.ok) { input.value = ''; msg.textContent = 'Отправлено ✓'; load(); }
+                else msg.textContent = data.error || 'Ошибка';
+            });
+        }
+        load();
+    </script>
+</body>
+</html>

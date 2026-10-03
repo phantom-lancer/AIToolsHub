@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Tools Hub — Каталог нейросетей</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Unbounded:wght@500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="bg-orbs">
+        <div class="orb orb-1"></div>
+        <div class="orb orb-2"></div>
+        <div class="orb orb-3"></div>
+    </div>
+
+    <header class="header">
+        <nav class="nav container">
+            <a href="#top" class="logo">AI<span>Tools</span>Hub</a>
+            <div class="auth-area">
+                <select class="theme-select" id="themeSelect" title="Тема">
+                    <option value="auto">Авто</option>
+                    <option value="dark">Тёмная</option>
+                    <option value="light">Светлая</option>
+                </select>
+                <div class="auth-area" id="authArea" style="padding:0">
+                    <button class="btn-ghost" id="loginBtn">Войти</button>
+                    <button class="btn-primary-sm" id="registerBtn">Регистрация</button>
+                </div>
+            </div>
+        </nav>
+    </header>
+
+    <main id="top">
+        <section class="hero container">
+            <p class="hero-tag">Нейросети 2026</p>
+            <h1>Откройте мир <span class="gradient-text">AI-инструментов</span></h1>
+            <p class="hero-sub">Каталог лучших нейросетей для текста, кода, арта и видео.</p>
+            <button class="btn-ghost" id="luckyBtn" style="margin-top:20px">🎲 Мне повезёт — случайный инструмент</button>
+        </section>
+
+        <section id="catalog" class="container section">
+            <h2 class="section-title">Каталог инструментов</h2>
+            <div class="controls">
+                <input type="text" id="searchInput" placeholder="Поиск по названию или описанию...">
+                <div class="filters" id="filters">
+                    <button class="filter-btn active" data-filter="all">Все</button>
+                    <button class="filter-btn" data-filter="text">Текст</button>
+                    <button class="filter-btn" data-filter="code">Код</button>
+                    <button class="filter-btn" data-filter="art">Арт</button>
+                    <button class="filter-btn" data-filter="video">Видео</button>
+                </div>
+            </div>
+            <div class="grid" id="grid"></div>
+            <p class="empty" id="emptyMsg" hidden>Ничего не найдено.</p>
+        </section>
+    </main>
+
+    <footer class="footer">
+        <p>© 2026 AI Tools Hub</p>
+    </footer>
+
+    <div class="modal" id="loginModal" hidden>
+        <div class="modal-card glass">
+            <button class="modal-close" data-close>&times;</button>
+            <h3>Вход</h3>
+            <form id="loginForm">
+                <input type="text" name="username" placeholder="Логин" required>
+                <input type="password" name="password" placeholder="Пароль" required>
+                <button type="submit" class="btn-primary-sm">Войти</button>
+                <p class="form-error" id="loginError"></p>
+            </form>
+        </div>
+    </div>
+
+    <div class="modal" id="registerModal" hidden>
+        <div class="modal-card glass">
+            <button class="modal-close" data-close>&times;</button>
+            <h3>Регистрация</h3>
+            <form id="registerForm">
+                <input type="text" name="username" placeholder="Логин" required>
+                <input type="email" name="email" placeholder="Email" required>
+                <input type="password" name="password" placeholder="Пароль (мин. 6)" required>
+                <button type="submit" class="btn-primary-sm">Создать аккаунт</button>
+                <p class="form-error" id="registerError"></p>
+            </form>
+        </div>
+    </div>
+
+    <script src="theme.js"></script>
+    <script src="bg.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
