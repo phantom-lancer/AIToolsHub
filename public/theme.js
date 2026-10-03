@@ -16,6 +16,7 @@
         apply(mode);
         const sel = document.getElementById('themeSelect');
         if (sel) sel.value = mode;
+        if (typeof showToast === 'function') showToast('Тема изменена: ' + (mode === 'auto' ? 'Авто' : mode === 'dark' ? 'Тёмная' : 'Светлая'));
     };
 
     document.addEventListener('DOMContentLoaded', () => {

@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Сравнение нейросетей — AI Tools Hub</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Unbounded:wght@500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="bg-orbs"><div class="orb orb-1"></div><div class="orb orb-2"></div><div class="orb orb-3"></div></div>
+    <header class="header">
+        <nav class="nav container">
+            <a href="index.html" class="logo">AI<span>Tools</span>Hub</a>
+            <div style="display:flex;gap:10px;align-items:center">
+                <select class="theme-select" id="themeSelect">
+                    <option value="auto">Авто</option><option value="dark">Тёмная</option><option value="light">Светлая</option>
+                </select>
+                <a href="index.html" class="btn-ghost">← Главная</a>
+            </div>
+        </nav>
+    </header>
+
+    <main class="container section">
+        <h2 class="section-title">⚖️ Сравнение нейросетей</h2>
+        <div class="card glass" style="padding:26px;margin-bottom:24px">
+            <div class="controls" style="margin-bottom:0">
+                <select id="selA" class="theme-select" style="flex:1;min-width:200px"></select>
+                <span style="align-self:center;font-weight:700">VS</span>
+                <select id="selB" class="theme-select" style="flex:1;min-width:200px"></select>
+                <button class="btn-primary-sm" id="compareBtn">Сравнить</button>
+            </div>
+        </div>
+        <div id="compareResult"></div>
+    </main>
+
+    <footer class="footer"><p>© 2026 AI Tools Hub</p></footer>
+    <script src="toast.js"></script>
+    <script src="theme.js"></script>
+    <script src="bg.js"></script>
+    <script>
+        let tools = [];
+        fetch('/api/tools').then(r => r.json()).then(d => {
+            tools = d.tools;
+            const opts = tools.map(t => `<option value="${t.id}">${t.name}</option>`).join('');
+            document.getElementById('selA').innerHTML = opts;
+            document.getElementById('selB').innerHTML = opts;
+            document.getElementById('selB').selectedIndex = 1;
+        });
+
+        document.getElementById('compareBtn').addEventListener('click', () => {
+            const a = tools.find(t => t.id == document.getElementById('selA').value);
+            const b = tools.find(t => t.id == document.getElementById('selB').value);
+            if (!a || !b || a.id === b.id) {
+                document.getElementById('compareResult').innerHTML = '<p class="empty">Выберите два разных инструмента.</p>';
+                return;
+            }
+            const rows = [
+                ['Категория', a.category, b.category],
+                ['Рейтинг', '★ ' + (a.userAvg ?? a.rating), '★ ' + (b.userAvg ?? b.rating)],
+                ['Оценок', a.ratingsCount ?? 0, b.ratingsCount ?? 0],
+                ['Плюсы', a.pros, b.pros],
+                ['Минусы', a.cons, b.cons],
+                ['Лимиты / цена', a.limits, b.limits],
+                ['Скорость', a.speed, b.speed],
+                ['VPN', a.vpn, b.vpn],
+                ['Бесплатно', a.free ? 'Да' : 'Нет', b.free ? 'Да' : 'Нет'],
+                ['Без регистрации', a.noSignup ? 'Да' : 'Нет', b.noSignup ? 'Да' : 'Нет'],
+            ];
+            const winner = (a.userAvg ?? a.rating) >= (b.userAvg ?? b.rating) ? a : b;
+            const speedWinner = (a.speed.includes('Очень') ? 3 : a.speed === 'Быстро' ? 2 : 1) >= (b.speed.includes('Очень') ? 3 : b.speed === 'Быстро' ? 2 : 1) ? a : b;
+            document.getElementById('compareResult').innerHTML = `
+                <div class="card glass" style="padding:26px;overflow-x:auto;animation:fadeIn .5s ease">
+                    <table style="width:100%;border-collapse:collapse;min-width:560px">
+                        <tr><th style="text-align:left;padding:10px">Параметр</th><th style="padding:10px">${a.name}</th><th style="padding:10px">${b.name}</th></tr>
+                        ${rows.map(r => `<tr><td style="padding:10px;color:var(--muted)">${r[0]}</td><td style="padding:10px;text-align:center">${r[1]}</td><td style="padding:10px;text-align:center">${r[2]}</td></tr>`).join('')}
+                    </table>
+                </div>
+                <div class="card glass" style="padding:26px;margin-top:20px;animation:fadeIn .6s ease">
+                    <h3 style="margin-bottom:10px">🏆 Вердикт AI Tools Hub</h3>
+                    <p style="color:var(--muted)">По рейтингу пользователей лучше: <b style="color:var(--text)">${winner.name}</b>. По скорости удобнее: <b style="color:var(--text)">${speedWinner.name}</b>. Если нужен бесплатный старт без VPN — смотри строку «VPN» и «Бесплатно» выше.</p>
+                </div>`;
+        });
+    </script>
+</body>
+</html>

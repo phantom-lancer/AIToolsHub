@@ -36,25 +36,76 @@
             <p class="hero-tag">Нейросети 2026</p>
             <h1>Откройте мир <span class="gradient-text">AI-инструментов</span></h1>
             <p class="hero-sub">Каталог лучших нейросетей для текста, кода, арта и видео.</p>
-            <button class="btn-ghost" id="luckyBtn" style="margin-top:20px">🎲 Мне повезёт — случайный инструмент</button>
+            <div style="margin-top:20px;display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
+                <a href="compare.html" class="btn-primary-sm" style="text-decoration:none">⚖️ Сравнить нейросети</a>
+                <button class="btn-ghost" id="luckyBtn">🎲 Мне повезёт</button>
+            </div>
         </section>
 
         <section id="catalog" class="container section">
             <h2 class="section-title">Каталог инструментов</h2>
             <div class="controls">
-                <input type="text" id="searchInput" placeholder="Поиск по названию или описанию...">
+                <input type="text" id="searchInput" placeholder="Поиск по названию, описанию или тегам...">
                 <div class="filters" id="filters">
                     <button class="filter-btn active" data-filter="all">Все</button>
                     <button class="filter-btn" data-filter="text">Текст</button>
-                    <button class="filter-btn" data-filter="code">Код</button>
-                    <button class="filter-btn" data-filter="art">Арт</button>
-                    <button class="filter-btn" data-filter="video">Видео</button>
+                    <button class="filter-btn" data-filter="code">Кодинг</button>
+                    <button class="filter-btn" data-filter="art">Графика</button>
+                    <button class="filter-btn" data-filter="video">Аудио/Видео</button>
+                    <button class="filter-btn" data-filter="3d">3D</button>
+                    <button class="filter-btn" data-filter="assistant">Ассистенты</button>
                 </div>
+            </div>
+            <div class="controls" style="margin-bottom:20px">
+                <select id="paymentSel" class="theme-select">
+                    <option value="all">Любая оплата</option>
+                    <option value="free">Бесплатно</option>
+                    <option value="freemium">Freemium</option>
+                    <option value="paid">Платно</option>
+                </select>
+                <select id="vpnSel" class="theme-select">
+                    <option value="all">Любой доступ</option>
+                    <option value="Без VPN">Без VPN</option>
+                    <option value="Нужен VPN">Нужен VPN</option>
+                </select>
+                <select id="sortSel" class="theme-select">
+                    <option value="rating">По рейтингу</option>
+                    <option value="reviews">По отзывам</option>
+                </select>
             </div>
             <div class="grid" id="grid"></div>
             <p class="empty" id="emptyMsg" hidden>Ничего не найдено.</p>
         </section>
+
+        <section id="builder" class="container section">
+            <h2 class="section-title">Smart AI Stack Builder</h2>
+            <div class="card glass" style="padding:30px">
+                <p style="color:var(--muted);margin-bottom:16px">Выберите задачу и фильтры — подберём идеальный стек из 3 нейросетей.</p>
+                <div class="filters" id="builderCats">
+                    <button class="filter-btn active" data-cat="code">Кодинг</button>
+                    <button class="filter-btn" data-cat="art">3D / Дизайн</button>
+                    <button class="filter-btn" data-cat="text">Работа с текстом</button>
+                    <button class="filter-btn" data-cat="video">Аудио / Видео</button>
+                </div>
+                <div style="margin:16px 0;display:flex;gap:20px;flex-wrap:wrap">
+                    <label><input type="checkbox" id="fFree"> Бесплатно</label>
+                    <label><input type="checkbox" id="fNoSignup"> Без регистрации</label>
+                </div>
+                <button class="btn-primary-sm" id="buildBtn">Подобрать стек</button>
+                <div id="buildResult" style="margin-top:24px"></div>
+            </div>
+        </section>
+
+        <section id="radar" class="container section">
+            <h2 class="section-title">Live AI Radar</h2>
+            <div class="card glass" style="padding:30px">
+                <div id="radarBox"></div>
+                <p style="color:var(--muted);font-size:.8rem;margin-top:12px">Обновляется каждые 10 секунд</p>
+            </div>
+        </section>
     </main>
+
+    <button id="toTop" aria-label="Наверх">↑</button>
 
     <footer class="footer">
         <p>© 2026 AI Tools Hub</p>
@@ -87,6 +138,7 @@
         </div>
     </div>
 
+    <script src="toast.js"></script>
     <script src="theme.js"></script>
     <script src="bg.js"></script>
     <script src="script.js"></script>

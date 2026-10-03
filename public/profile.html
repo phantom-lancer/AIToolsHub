@@ -36,6 +36,7 @@
     </main>
 
     <footer class="footer"><p>© 2026 AI Tools Hub</p></footer>
+    <script src="toast.js"></script>
     <script src="theme.js"></script>
     <script src="bg.js"></script>
     <script>
@@ -94,7 +95,40 @@
             box.innerHTML = '<h3 style="margin-bottom:12px">Избранные инструменты</h3>' +
                 (data.favorites.length
                     ? data.favorites.map(t => `<a href="tool.html?id=${t.id}" style="display:inline-block;margin:0 8px 8px 0;padding:8px 16px;border-radius:50px;text-decoration:none;color:var(--text);background:var(--card);border:1px solid var(--border)">${t.name} ★ ${t.rating}</a>`).join('')
-                    : '<p style="color:var(--muted)">Пока пусто — добавляйте сердечком на странице инструмента.</p>');
+                    : '<p style="color:var(--muted)">Пока пусто — добавляйте сердечком на странице инструмента.</p>') +
+                `<div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap">
+                    <button class="btn-ghost" id="exportBtn">📤 Экспорт в JSON</button>
+                    <label class="btn-ghost" style="cursor:pointer">📥 Импорт JSON<input type="file" id="importFile" accept=".json" hidden></label>
+                </div>
+                <p id="ioMsg" style="color:var(--muted);font-size:.85rem;min-height:1.2em"></p>`;
+            box.querySelector('#exportBtn').addEventListener('click', () => {
+                const blob = new Blob([JSON.stringify({ favorites: data.favorites.map(t => t.id) }, null, 2)], { type: 'application/json' });
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = 'ai-tools-favorites.json';
+                a.click();
+                showToast('Закладки экспортированы 📤');
+            });
+            box.querySelector('#importFile').addEventListener('change', e => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = async () => {
+                    try {
+                        const parsed = JSON.parse(reader.result);
+                        const ids = parsed.favorites || parsed;
+                        const res = await fetch('/api/favorites/import', {
+                            method: 'POST', credentials: 'same-origin',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ toolIds: ids }),
+                        });
+                        const d = await res.json();
+                        box.querySelector('#ioMsg').textContent = res.ok ? `Импортировано: ${d.imported} ✓` : (d.error || 'Ошибка');
+                        if (res.ok) { showToast(`Импортировано ${d.imported} закладок 📥`); setTimeout(() => location.reload(), 800); }
+                    } catch { box.querySelector('#ioMsg').textContent = 'Неверный JSON-файл'; }
+                };
+                reader.readAsText(file);
+            });
             document.getElementById('profileBox').appendChild(box);
         });
 

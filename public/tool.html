@@ -33,10 +33,12 @@
     </main>
 
     <footer class="footer"><p>© 2026 AI Tools Hub</p></footer>
+    <script src="toast.js"></script>
     <script src="theme.js"></script>
     <script src="bg.js"></script>
     <script>
         const categoryNames = { text: 'Текст', code: 'Код', art: 'Арт', video: 'Видео' };
+        const categoryEmoji = { text: '✍️', code: '💻', art: '🎨', video: '🎬' };
         const id = new URLSearchParams(location.search).get('id');
         let myRating = 0;
 
@@ -60,7 +62,11 @@
             document.getElementById('toolPage').innerHTML = `
                 <div class="card glass" style="max-width:760px;margin:0 auto;padding:36px">
                     <span class="card-badge badge-${tool.category}">${categoryNames[tool.category]}</span>
+                    <span class="card-badge" style="background:rgba(255,255,255,.08);color:var(--muted)">${({ free: 'Бесплатно', freemium: 'Freemium', paid: 'Платно' })[tool.payment]}</span>
+                    <span class="card-badge" style="background:${tool.vpn === 'Без VPN' ? 'rgba(52,211,153,.15);color:#34d399' : 'rgba(248,113,113,.15);color:#f87171'}">${tool.vpn}</span>
+                    <br><a href="${tool.url}" target="_blank" style="color:var(--accent2)">${tool.url}</a>
                     <h1 style="font-family:'Unbounded';margin-bottom:16px">${tool.name}</h1>
+                    <img class="tool-logo" style="width:64px;height:64px" src="https://www.google.com/s2/favicons?domain=${tool.domain}&sz=128" alt="${tool.name}" onerror="this.outerHTML='&lt;div class=tool-logo logo-fallback style=width:64px;height:64px&gt;${tool.name[0]}&lt;/div&gt;'">
                     <p style="color:var(--muted);margin-bottom:20px">${tool.desc}</p>
                     <p class="card-rating" style="font-size:1.3rem">★ ${userAvg ?? tool.rating} / 5 <small style="color:var(--muted);font-size:.9rem">(${ratingsCount} оценок)</small></p>
                     <button class="btn-ghost" id="favBtn" style="margin-left:12px">${isFavorite ? '♥ В избранном' : '♡ В избранное'}</button>
@@ -92,7 +98,7 @@
             document.getElementById('favBtn').addEventListener('click', async () => {
                 const res = await fetch('/api/tools/' + id + '/favorite', { method: 'POST', credentials: 'same-origin' });
                 const data = await res.json();
-                if (res.ok) document.getElementById('favBtn').textContent = data.favorite ? '♥ В избранном' : '♡ В избранное';
+                if (res.ok) { document.getElementById('favBtn').textContent = data.favorite ? '♥ В избранном' : '♡ В избранное'; showToast(data.favorite ? 'Добавлено в избранное ♥' : 'Убрано из избранного'); }
                 else document.getElementById('favBtn').textContent = 'Войдите, чтобы добавить';
             });
 
@@ -107,7 +113,7 @@
                 });
                 const data = await res.json();
                 const msg = document.getElementById('rateMsg');
-                if (res.ok) { myRating = value; renderStars(); msg.textContent = 'Оценка сохранена ✓'; }
+                if (res.ok) { myRating = value; renderStars(); msg.textContent = 'Оценка сохранена ✓'; showToast('Оценка сохранена ★ ' + value); }
                 else msg.textContent = data.error || 'Ошибка';
             });
 
@@ -120,7 +126,7 @@
                     body: JSON.stringify({ text: input.value }),
                 });
                 const data = await res.json();
-                if (res.ok) { input.value = ''; msg.textContent = 'Отправлено ✓'; load(); }
+                if (res.ok) { input.value = ''; msg.textContent = 'Отправлено ✓'; showToast('Комментарий отправлен ✓'); load(); }
                 else msg.textContent = data.error || 'Ошибка';
             });
         }
