@@ -1,22 +1,26 @@
 #!/usr/bin/env bash
-# Обновление сайта на VPS после изменений в коде.
-# На сервере: cd /var/www/ai-tools-hub && ./deploy/update.sh
+# Обновление сайта после изменений в коде.
+#   cd AIToolsHub && git pull && ./deploy/update.sh
 set -euo pipefail
 
-APP_DIR="/var/www/ai-tools-hub"
-cd "$APP_DIR"
+APP_NAME="ai-tools-hub"
+SRC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$SRC_DIR"
 
-echo "==> Ставим зависимости"
-npm install --omit=dev
+echo "==> Зависимости"
+npm install --omit=dev --no-audit --no-fund
 
-echo "==> Перезапускаем"
-systemctl restart ai-tools-hub
-sleep 3
+echo "==> Права"
+chown -R www-data:www-data "$SRC_DIR"
+
+echo "==> Перезапуск"
+systemctl restart "${APP_NAME}"
+sleep 4
 
 if curl -fsS http://127.0.0.1:3000/api/tools > /dev/null; then
     echo "OK, сайт работает."
 else
     echo "Упало, логи:"
-    journalctl -u ai-tools-hub -n 40 --no-pager
+    journalctl -u "${APP_NAME}" -n 40 --no-pager
     exit 1
 fi
