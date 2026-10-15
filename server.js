@@ -23,6 +23,39 @@ function ensureColumn(table, column, definition) {
 }
 
 db.exec(`
+    CREATE TABLE IF NOT EXISTS tools (
+        id INTEGER PRIMARY KEY,
+        name TEXT NOT NULL,
+        domain TEXT NOT NULL,
+        category TEXT NOT NULL,
+        desc TEXT NOT NULL,
+        payment TEXT NOT NULL,
+        vpn TEXT NOT NULL,
+        url TEXT NOT NULL,
+        tags TEXT NOT NULL,
+        editorial REAL NOT NULL DEFAULT 4.5,
+        speed TEXT NOT NULL,
+        limits TEXT NOT NULL,
+        pros TEXT NOT NULL,
+        cons TEXT NOT NULL,
+        is_free INTEGER NOT NULL DEFAULT 0,
+        no_signup INTEGER NOT NULL DEFAULT 0,
+        verified_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE IF NOT EXISTS tool_changes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        tool_id INTEGER NOT NULL,
+        field TEXT NOT NULL,
+        old_value TEXT,
+        new_value TEXT,
+        note TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS tool_changes_tool ON tool_changes(tool_id, created_at);
+    CREATE TABLE IF NOT EXISTS admins (
+        user_id INTEGER PRIMARY KEY
+    );
     CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         username TEXT UNIQUE NOT NULL,
@@ -129,12 +162,12 @@ function setSessionCookie(res, token) {
     res.setHeader('Set-Cookie', `session=${token}; HttpOnly; Path=/; Max-Age=${7 * 24 * 3600}; SameSite=Lax`);
 }
 
-// Tools data
-// Seed: 24 нейросети
+// Стартовый набор данных. Заливается в таблицу tools один раз,
+// дальше правки идут через админку и в коде уже не хранятся.
 const T = (id, name, domain, category, desc, payment, vpn, url, tags, rating, speed, limits, pros, cons, free, noSignup) =>
     ({ id, name, domain, category, desc, payment, vpn, url, tags, rating, speed, limits, pros, cons, free, noSignup });
 
-const tools = [
+const TOOL_SEED = [
     T(1, 'ChatGPT', 'openai.com', 'text', 'Универсальный чат-бот для текстов, идей и анализа.', 'freemium', 'Нужен VPN', 'https://chatgpt.com', ['чат', 'текст', 'ассистент'], 4.8, 'Быстро', 'Бесплатно ~40 запросов/3ч', 'Универсален, плагины', 'Бывает «галлюцинирует»', true, false),
     T(2, 'Claude', 'claude.ai', 'text', 'Долгие тексты, эссе и работа с документами.', 'freemium', 'Нужен VPN', 'https://claude.ai', ['текст', 'эссе', 'документы'], 4.7, 'Средне', 'Бесплатно с лимитом, Pro $20', 'Сильная логика, длинный контекст', 'Меньше плагинов', false, false),
     T(3, 'DeepSeek', 'deepseek.com', 'text', 'Мощный open-source ассистент с рассуждениями.', 'free', 'Без VPN', 'https://chat.deepseek.com', ['текст', 'код', 'reasoning'], 4.6, 'Средне', 'Щедрый бесплатный лимит', 'Открытые веса, математика', 'Пиковые задержки', true, true),
@@ -161,7 +194,65 @@ const tools = [
     T(24, 'Kaedim', 'kaedim3d.com', '3d', '2D-картинки в 3D-ассеты для игр.', 'paid', 'Без VPN', 'https://www.kaedim3d.com', ['3d', 'игры'], 4.2, 'Средне', 'От $15/мес', 'Геймдев-ассеты', 'Подписка', false, false),
 ];
 
-// API — auth
+// ---------- слой доступа к инструментам ----------
+// Читаем из БД, собирая те же поля, которые раньше лежали в массиве,
+// поэтому фронтенд и остальные эндпоинты ничего не замечают.
+function rowToTool(r) {
+    if (!r) return null;
+    return {
+        id: r.id,
+        name: r.name,
+        domain: r.domain,
+        category: r.category,
+        desc: r.desc,
+        payment: r.payment,
+        vpn: r.vpn,
+        url: r.url,
+        tags: r.tags ? JSON.parse(r.tags) : [],
+        rating: r.editorial,
+        editorial: r.editorial,
+        speed: r.speed,
+        limits: r.limits,
+        pros: r.pros,
+        cons: r.cons,
+        free: !!r.is_free,
+        noSignup: !!r.no_signup,
+        verifiedAt: r.verified_at,
+        updatedAt: r.updated_at,
+    };
+}
+
+const ratingStmt = db.prepare('SELECT COUNT(*) as n, AVG(value) as avg FROM ratings WHERE tool_id = ?');
+
+function getTools() {
+    const rows = db.prepare('SELECT * FROM tools ORDER BY editorial DESC, name ASC').all();
+    return rows.map(r => {
+        const t = rowToTool(r);
+        const stats = ratingStmt.get(t.id);
+        t.ratingsCount = stats.n;
+        t.userAvg = stats.avg ? Math.round(stats.avg * 10) / 10 : null;
+        return t;
+    });
+}
+
+function getTool(id) {
+    return rowToTool(db.prepare('SELECT * FROM tools WHERE id = ?').get(id));
+}
+
+// Первый запуск: переносим стартовый набор в базу
+if (!db.prepare('SELECT COUNT(*) AS n FROM tools').get().n) {
+    const insert = db.prepare(`
+        INSERT INTO tools (id, name, domain, category, desc, payment, vpn, url, tags,
+                           editorial, speed, limits, pros, cons, is_free, no_signup)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    for (const t of TOOL_SEED) {
+        insert.run(t.id, t.name, t.domain, t.category, t.desc, t.payment, t.vpn, t.url,
+            JSON.stringify(t.tags), t.rating, t.speed, t.limits, t.pros, t.cons,
+            t.free ? 1 : 0, t.noSignup ? 1 : 0);
+    }
+    console.log(`[seed] ${TOOL_SEED.length} инструментов перенесены в базу`);
+}
 app.post('/api/register', async (req, res) => {
     const { username, email, password } = req.body || {};
     if (!username || !email || !password) return res.status(400).json({ error: 'Заполните все поля' });
@@ -213,15 +304,11 @@ app.post('/api/avatar', requireAuth, (req, res) => {
 
 // API — tools
 app.get('/api/tools', (req, res) => {
-    const enriched = tools.map(t => {
-        const r = db.prepare('SELECT COUNT(*) as n, AVG(value) as avg FROM ratings WHERE tool_id = ?').get(t.id);
-        return { ...t, ratingsCount: r.n, userAvg: r.avg ? Math.round(r.avg * 10) / 10 : null };
-    });
-    res.json({ tools: enriched });
+    res.json({ tools: getTools() });
 });
 
 app.get('/api/tools/:id', (req, res) => {
-    const tool = tools.find(t => t.id === Number(req.params.id));
+    const tool = getTool(Number(req.params.id));
     if (!tool) return res.status(404).json({ error: 'Не найдено' });
     const r = db.prepare('SELECT COUNT(*) as n, AVG(value) as avg FROM ratings WHERE tool_id = ?').get(tool.id);
     const viewer = getUser(req);
@@ -244,7 +331,7 @@ app.get('/api/tools/:id', (req, res) => {
 app.post('/api/tools/:id/rate', requireAuth, (req, res) => {
     const toolId = Number(req.params.id);
     const value = Number(req.body && req.body.value);
-    if (!tools.find(t => t.id === toolId)) return res.status(404).json({ error: 'Не найдено' });
+    if (!getTool(toolId)) return res.status(404).json({ error: 'Не найдено' });
     if (!Number.isInteger(value) || value < 1 || value > 5) return res.status(400).json({ error: 'Оценка 1–5' });
     db.prepare('INSERT INTO ratings (user_id, tool_id, value) VALUES (?, ?, ?) ON CONFLICT(user_id, tool_id) DO UPDATE SET value = excluded.value').run(req.user.id, toolId, value);
     res.json({ ok: true });
@@ -252,7 +339,7 @@ app.post('/api/tools/:id/rate', requireAuth, (req, res) => {
 
 app.post('/api/tools/:id/favorite', requireAuth, (req, res) => {
     const toolId = Number(req.params.id);
-    if (!tools.find(t => t.id === toolId)) return res.status(404).json({ error: 'Не найдено' });
+    if (!getTool(toolId)) return res.status(404).json({ error: 'Не найдено' });
     const exists = db.prepare('SELECT 1 FROM favorites WHERE user_id = ? AND tool_id = ?').get(req.user.id, toolId);
     if (exists) {
         db.prepare('DELETE FROM favorites WHERE user_id = ? AND tool_id = ?').run(req.user.id, toolId);
@@ -264,12 +351,12 @@ app.post('/api/tools/:id/favorite', requireAuth, (req, res) => {
 
 app.get('/api/favorites', requireAuth, (req, res) => {
     const rows = db.prepare('SELECT tool_id FROM favorites WHERE user_id = ?').all(req.user.id);
-    res.json({ favorites: rows.map(r => tools.find(t => t.id === r.tool_id)).filter(Boolean) });
+    res.json({ favorites: rows.map(r => getTool(r.tool_id)).filter(Boolean) });
 });
 
 app.post('/api/favorites/import', requireAuth, (req, res) => {
     const ids = Array.isArray(req.body && req.body.toolIds) ? req.body.toolIds.filter(Number.isInteger) : [];
-    const valid = ids.filter(id => tools.find(t => t.id === id));
+    const valid = ids.filter(id => getTool(id));
     const stmt = db.prepare('INSERT OR IGNORE INTO favorites (user_id, tool_id) VALUES (?, ?)');
     valid.forEach(id => stmt.run(req.user.id, id));
     res.json({ ok: true, imported: valid.length });
@@ -286,7 +373,7 @@ app.post('/api/stack', requireAuth, (req, res) => {
 app.get('/api/stack', requireAuth, (req, res) => {
     const row = db.prepare('SELECT tool_ids, updated_at FROM saved_stacks WHERE user_id = ?').get(req.user.id);
     const ids = row ? JSON.parse(row.tool_ids) : [];
-    res.json({ stack: ids.map(id => tools.find(t => t.id === id)).filter(Boolean), updatedAt: row ? row.updated_at : null });
+    res.json({ stack: ids.map(id => getTool(id)).filter(Boolean), updatedAt: row ? row.updated_at : null });
 });
 
 const CHANGELOG = [
@@ -491,7 +578,8 @@ app.get('/api/daily', (req, res) => {
     const now = new Date();
     const start = new Date(now.getFullYear(), 0, 0);
     const dayOfYear = Math.floor((now - start) / 86400000);
-    const tool = tools[dayOfYear % tools.length];
+    const all = getTools();
+    const tool = all[dayOfYear % all.length];
     const dayIndex = Math.floor(Date.now() / 86400000);
 
     const tips = {
@@ -511,7 +599,7 @@ app.get('/api/community-stacks', (req, res) => {
     res.json({
         stacks: rows.map(r => ({
             ...r,
-            tools: JSON.parse(r.tool_ids).map(id => tools.find(t => t.id === id)).filter(Boolean),
+            tools: JSON.parse(r.tool_ids).map(id => getTool(id)).filter(Boolean),
         })),
     });
 });
@@ -580,10 +668,101 @@ app.post('/api/comments/:id/like', requireAuth, (req, res) => {
     res.json({ liked: true });
 });
 
+// ---------- админка: правка данных инструмента ----------
+// Первый зарегистрировавшийся пользователь становится админом.
+// Это осознанный компромисс для учебного проекта: админ один,
+// отдельную систему ролей заводить избыточно.
+function requireAdmin(req, res, next) {
+    const user = getUser(req);
+    if (!user) return res.status(401).json({ error: 'Требуется авторизация' });
+    const isFirst = !db.prepare('SELECT 1 FROM users WHERE id != ? LIMIT 1').get(user.id);
+    const isAdmin = db.prepare('SELECT 1 FROM admins WHERE user_id = ?').get(user.id);
+    if (!isFirst && !isAdmin) return res.status(403).json({ error: 'Нужны права администратора' });
+    req.user = user;
+    next();
+}
+
+// Первая учётная запись автоматически становится админом
+if (!db.prepare('SELECT COUNT(*) AS n FROM admins').get().n) {
+    const first = db.prepare('SELECT id FROM users ORDER BY id ASC LIMIT 1').get();
+    if (first) db.prepare('INSERT OR IGNORE INTO admins (user_id) VALUES (?)').run(first.id);
+}
+
+const EDITABLE = {
+    name: 'Название', desc: 'Описание', limits: 'Лимиты и цена', pros: 'Плюсы', cons: 'Минусы',
+    speed: 'Скорость', payment: 'Оплата', vpn: 'Доступ', category: 'Категория',
+    url: 'Ссылка', domain: 'Домен',
+};
+
+app.post('/api/tools/:id/update', requireAdmin, (req, res) => {
+    const id = Number(req.params.id);
+    const tool = db.prepare('SELECT * FROM tools WHERE id = ?').get(id);
+    if (!tool) return res.status(404).json({ error: 'Инструмент не найден' });
+
+    const patch = {};
+    for (const [field, label] of Object.entries(EDITABLE)) {
+        if (!(field in req.body)) continue;
+        const value = String(req.body[field]).trim();
+        if (!value) return res.status(400).json({ error: `Поле «${label}» не может быть пустым` });
+        if (value.length > 400) return res.status(400).json({ error: `Поле «${label}» слишком длинное` });
+        if (value === tool[field]) continue;
+        patch[field] = { label, old: tool[field], next: value };
+    }
+
+    if (Array.isArray(req.body.tags)) {
+        const tags = req.body.tags.map(t => String(t).trim().toLowerCase()).filter(Boolean).slice(0, 10);
+        const oldTags = JSON.parse(tool.tags);
+        if (JSON.stringify(tags) !== JSON.stringify(oldTags)) {
+            patch.tags = { label: 'Теги', old: oldTags.join(', '), next: tags.join(', ') };
+            req.body.tags = tags;
+        }
+    }
+
+    if (!Object.keys(patch).length) return res.json({ ok: true, updated: [] });
+
+    const sets = Object.keys(patch).map(f => `${f} = ?`);
+    const values = Object.values(patch).map(p => p.next);
+    sets.push('updated_at = CURRENT_TIMESTAMP');
+    db.prepare(`UPDATE tools SET ${sets.join(', ')} WHERE id = ?`).run(...values, id);
+
+    // Каждое изменение — запись в историю. Из неё потом строится график.
+    const log = db.prepare('INSERT INTO tool_changes (tool_id, field, old_value, new_value, note) VALUES (?, ?, ?, ?, ?)');
+    for (const [field, p] of Object.entries(patch)) {
+        log.run(id, field, String(p.old ?? ''), String(p.next ?? ''), String(req.body.note || '').slice(0, 200));
+    }
+
+    res.json({ ok: true, updated: Object.values(patch).map(p => p.label), tool: getTool(id) });
+});
+
+// Подтверждение, что данные проверены — без правки содержимого
+app.post('/api/tools/:id/verify', requireAdmin, (req, res) => {
+    const id = Number(req.params.id);
+    if (!getTool(id)) return res.status(404).json({ error: 'Инструмент не найден' });
+    db.prepare('UPDATE tools SET verified_at = CURRENT_TIMESTAMP WHERE id = ?').run(id);
+    res.json({ ok: true, tool: getTool(id) });
+});
+
+// История изменений по инструменту
+app.get('/api/tools/:id/history', (req, res) => {
+    const id = Number(req.params.id);
+    if (!getTool(id)) return res.status(404).json({ error: 'Инструмент не найден' });
+    const rows = db.prepare('SELECT field, old_value, new_value, note, created_at FROM tool_changes WHERE tool_id = ? ORDER BY created_at DESC, id DESC LIMIT 50').all(id);
+    res.json({ history: rows });
+});
+
+// Список того, что пора проверить: чем дольше не проверяли, тем выше
+app.get('/api/admin/stale', requireAdmin, (req, res) => {
+    const rows = db.prepare(`
+        SELECT * FROM tools
+        ORDER BY COALESCE(verified_at, '2000-01-01') ASC
+    `).all();
+    res.json({ tools: rows.map(rowToTool) });
+});
+
 app.post('/api/tools/:id/comment', requireAuth, (req, res) => {
     const toolId = Number(req.params.id);
     const text = (req.body && req.body.text || '').trim();
-    if (!tools.find(t => t.id === toolId)) return res.status(404).json({ error: 'Не найдено' });
+    if (!getTool(toolId)) return res.status(404).json({ error: 'Не найдено' });
     if (text.length < 2 || text.length > 500) return res.status(400).json({ error: 'Комментарий 2–500 символов' });
     db.prepare('INSERT INTO comments (tool_id, user_id, text) VALUES (?, ?, ?)').run(toolId, req.user.id, text);
     res.status(201).json({ ok: true });

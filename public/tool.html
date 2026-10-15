@@ -104,6 +104,19 @@
                     </div>
 
                     <div style="margin-top:26px;padding-top:20px;border-top:.5px solid var(--line-2)">
+                        <div class="verified">
+                            <span class="dot ${tool.verifiedAt && Date.now() - new Date(tool.verifiedAt) < 30 * 86400000 ? 'ok' : ''}"></span>
+                            <span>Данные проверены ${new Date(tool.verifiedAt || Date.now()).toLocaleDateString('ru-RU')}
+${Math.floor((Date.now() - new Date(tool.verifiedAt || Date.now())) / 86400000) > 30 ? ' · возможно, устарели' : ''}</span>
+                        </div>
+                    </div>
+
+                    <div style="margin-top:26px;padding-top:20px;border-top:.5px solid var(--line-2)">
+                        <p class="m-label" style="margin-bottom:10px">история изменений</p>
+                        <div id="toolHistory"><p class="m-label">Загружаю…</p></div>
+                    </div>
+
+                    <div style="margin-top:26px;padding-top:20px;border-top:.5px solid var(--line-2)">
                         <div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap">
                             <span style="font-family:var(--mono);font-size:26px">${(userAvg ?? tool.rating).toFixed(1)}</span>
                             <span class="m-label">${userAvg
@@ -131,6 +144,40 @@
                 </div>`;
 
             renderStars();
+
+            /* ---------- история изменений: главная ценность каталога ---------- */
+            (async () => {
+                const box = document.getElementById('toolHistory');
+                try {
+                    const { history } = await fetch(`/api/tools/${id}/history`).then(r => r.json());
+                    const FIELD = {
+                        limits: 'Лимиты', payment: 'Оплата', vpn: 'Доступ',
+                        speed: 'Скорость', desc: 'Описание', pros: 'Плюсы', cons: 'Минусы',
+                    };
+                    if (!history.length) {
+                        box.innerHTML = `<p class="m-label">С момента запуска проекта изменений не было —
+                            значения заполнены при старте. Как только провайдер поменяет условия,
+                            здесь появится запись.</p>`;
+                        return;
+                    }
+                    const groups = new Map();
+                    history.forEach(h => {
+                        if (!groups.has(h.created_at)) groups.set(h.created_at, []);
+                        groups.get(h.created_at).push(h);
+                    });
+                    box.innerHTML = [...groups].map(([date, items]) => `
+                        <div class="hist-day">
+                            <p class="m-label">${new Date(date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })}</p>
+                            ${items.map(h => `
+                                <div class="hist-row">
+                                    <span class="m-label">${FIELD[h.field] || h.field}</span>
+                                    <p><s>${h.old_value || '—'}</s> → <b>${h.new_value}</b></p>
+                                </div>`).join('')}
+                        </div>`).join('');
+                } catch {
+                    box.innerHTML = '<p class="m-label">Не удалось загрузить историю.</p>';
+                }
+            })();
 
             document.getElementById('stars').addEventListener('click', async e => {
                 const s = e.target.closest('span');

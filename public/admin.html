@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="light" data-mode="auto">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#eef0f4">
+    <meta name="robots" content="noindex">
+    <title>Редактор каталога — AI Tools Hub</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header class="topbar glass">
+        <a class="brand" href="index.html"><span class="dotmark">AI</span>AI Tools Hub</a>
+        <span class="m-label">редактор каталога</span>
+        <span class="sp"></span>
+        <button class="theme-toggle" aria-label="Сменить тему">
+            <svg class="i-auto" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.6"/><path d="M12 3.4a8.6 8.6 0 0 1 0 17.2Z" fill="currentColor" stroke="none"/></svg>
+            <svg class="i-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.6v2.2M12 19.2v2.2M2.6 12h2.2M19.2 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6"/></svg>
+            <svg class="i-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 13.2A8.6 8.6 0 0 1 10.8 3a8.6 8.6 0 1 0 10.2 10.2Z"/></svg>
+        </button>
+        <a class="btn" href="index.html">К сайту</a>
+    </header>
+
+    <main class="wrap" style="padding:120px 0 60px">
+        <p class="m-label">админка</p>
+        <h1 style="font-size:clamp(28px,5vw,40px);margin:8px 0 12px">Редактор каталога</h1>
+        <p style="color:var(--fg-2);max-width:60ch;margin-bottom:28px">
+            Правь лимиты, цены и описания без правки кода. Каждое сохранение попадает в историю —
+            её видно посетителям на странице инструмента.
+        </p>
+
+        <div id="gate" class="panel glass" style="padding:26px">
+            <p>Нужен вход с правами администратора.</p>
+            <p class="m-label" id="gateMsg" style="margin-top:8px"></p>
+            <div style="display:flex;gap:10px;margin-top:18px;flex-wrap:wrap">
+                <a class="btn" href="index.html">Войти на сайте</a>
+                <button class="btn primary" id="reloadBtn">Проверить снова</button>
+            </div>
+        </div>
+
+        <div id="work" hidden>
+            <div class="admin-bar">
+                <div>
+                    <p class="m-label">требуют проверки</p>
+                    <p class="admin-hint" id="staleInfo"></p>
+                </div>
+                <button class="btn quiet" id="refreshBtn">Обновить</button>
+            </div>
+
+            <div class="admin-layout">
+                <aside class="admin-list" id="toolList" aria-label="Список инструментов"></aside>
+
+                <section class="panel glass admin-editor" id="editor" hidden>
+                    <header class="admin-editor-head">
+                        <div style="min-width:0">
+                            <h2 id="edName"></h2>
+                            <p class="m-label" id="edMeta"></p>
+                        </div>
+                        <span class="sp" style="flex:1"></span>
+                        <button class="btn quiet" id="verifyBtn" style="height:34px;padding:0 14px;font-size:14px">
+                            Данные проверены
+                        </button>
+                    </header>
+
+                    <div class="admin-fields">
+                        <label class="fld"><span>Лимиты и цена</span>
+                            <input type="text" id="fLimits" maxlength="400"></label>
+                        <label class="fld"><span>Описание</span>
+                            <textarea id="fDesc" rows="2" maxlength="400"></textarea></label>
+                        <div class="admin-two">
+                            <label class="fld"><span>Плюсы</span>
+                                <input type="text" id="fPros" maxlength="400"></label>
+                            <label class="fld"><span>Минусы</span>
+                                <input type="text" id="fCons" maxlength="400"></label>
+                        </div>
+                        <div class="admin-two">
+                            <label class="fld"><span>Скорость</span>
+                                <input type="text" id="fSpeed" maxlength="80"></label>
+                            <label class="fld"><span>Доступ</span>
+                                <input type="text" id="fVpn" maxlength="40"></label>
+                        </div>
+                        <div class="admin-two">
+                            <label class="fld"><span>Оплата</span>
+                                <input type="text" id="fPayment" maxlength="40"></label>
+                            <label class="fld"><span>Ссылка</span>
+                                <input type="text" id="fUrl" maxlength="200"></label>
+                        </div>
+                        <label class="fld"><span>Теги через запятую</span>
+                            <input type="text" id="fTags" maxlength="200"></label>
+                    </div>
+
+                    <div class="admin-save">
+                        <span class="m-label" id="edHint"></span>
+                        <span style="flex:1"></span>
+                        <button class="btn quiet" id="resetBtn">Сбросить</button>
+                        <button class="btn primary" id="saveBtn">Сохранить</button>
+                    </div>
+
+                    <details class="admin-history">
+                        <summary class="m-label">История изменений</summary>
+                        <div id="edHistory"></div>
+                    </details>
+                </section>
+            </div>
+        </div>
+    </main>
+
+    <div id="toast" aria-live="polite"></div>
+
+    <script src="toast.js"></script>
+    <script src="theme.js"></script>
+    <script src="bg.js"></script>
+    <script src="motion-loader.js"></script>
+    <script>window.__motion = null; loadMotion().then(m => window.__motion = m);</script>
+    <script src="transitions.js"></script>
+    <script>
+        let tools = [];
+        let current = null;
+        let draft = null;
+
+        const el = id => document.getElementById(id);
+        const fields = {
+            limits: 'fLimits', desc: 'fDesc', pros: 'fPros', cons: 'fCons',
+            speed: 'fSpeed', vpn: 'fVpn', payment: 'fPayment', url: 'fUrl', tags: 'fTags',
+        };
+
+        function readDraft() {
+            const out = {};
+            for (const [key, id] of Object.entries(fields)) out[key] = el(id).value.trim();
+            out.tags = out.tags.split(',').map(t => t.trim()).filter(Boolean);
+            return out;
+        }
+
+        function fill(tool) {
+            el('edName').textContent = tool.name;
+            el('edMeta').textContent = `${tool.domain} · проверено ${new Date(tool.verifiedAt).toLocaleDateString('ru-RU')}`;
+            for (const [key, id] of Object.entries(fields)) {
+                el(id).value = key === 'tags' ? (tool.tags || []).join(', ') : tool[key];
+            }
+            el('edHint').textContent = '';
+        }
+
+        function openTool(id) {
+            current = tools.find(t => t.id === id);
+            draft = readDraft();
+            fill(current);
+            el('editor').hidden = false;
+            loadHistory();
+            document.querySelectorAll('.admin-tool').forEach(b =>
+                b.setAttribute('aria-current', String(Number(b.dataset.id) === id)));
+        }
+
+        async function loadHistory() {
+            const box = el('edHistory');
+            box.innerHTML = '<p class="m-label">Загружаю…</p>';
+            try {
+                const { history } = await api(`/api/tools/${current.id}/history`);
+                box.innerHTML = history.length ? history.map(h => `
+                    <div class="hrow">
+                        <span class="m-label">${h.field}</span>
+                        <p class="hchange"><s>${h.old_value || '—'}</s> → <b>${h.new_value}</b></p>
+                        <span class="m-label">${new Date(h.created_at).toLocaleString('ru-RU')}</span>
+                    </div>`).join('')
+                    : '<p class="m-label">Изменений пока не было. Всё заполнено при старте проекта.</p>';
+            } catch {
+                box.innerHTML = '<p class="m-label">Не удалось загрузить историю.</p>';
+            }
+        }
+
+        function drawList() {
+            const stale = [...tools].sort((a, b) =>
+                new Date(a.verifiedAt) - new Date(b.verifiedAt));
+            el('staleInfo').textContent = stale.length
+                ? `Дольше всего без проверки: ${stale[0].name} (${new Date(stale[0].verifiedAt).toLocaleDateString('ru-RU')})`
+                : '';
+
+            el('toolList').innerHTML = tools.map(t => {
+                const days = Math.floor((Date.now() - new Date(t.verifiedAt)) / 86400000);
+                const badge = days > 30 ? 'warn' : days > 14 ? '' : 'ok';
+                return `
+                    <button class="admin-tool" data-id="${t.id}">
+                        <b>${t.name}</b>
+                        <span class="admin-tool-meta">${t.limits}</span>
+                        <span class="m-label">${days === 0 ? 'сегодня' : days + ' дн. назад'}</span>
+                        <span class="dot ${badge}"></span>
+                    </button>`;
+            }).join('');
+
+            el('toolList').querySelectorAll('.admin-tool').forEach(b =>
+                b.addEventListener('click', () => openTool(Number(b.dataset.id))));
+        }
+
+        async function load() {
+            const res = await fetch('/api/admin/stale', { credentials: 'same-origin' });
+            if (!res.ok) {
+                el('gate').hidden = false;
+                el('work').hidden = true;
+                el('gateMsg').textContent = res.status === 401
+                    ? 'Вы не вошли в аккаунт.'
+                    : 'Правки доступны только администратору.';
+                return;
+            }
+            const data = await res.json();
+            tools = data.tools.sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+            el('gate').hidden = true;
+            el('work').hidden = false;
+            drawList();
+            openTool(tools[0].id);
+        }
+
+        el('saveBtn').addEventListener('click', async () => {
+            const patch = readDraft();
+            const changed = Object.keys(patch).filter(k => {
+                const before = k === 'tags' ? (current.tags || []).join(', ') : current[k];
+                const after = k === 'tags' ? patch.tags.join(', ') : patch[k];
+                return before !== after;
+            });
+            if (!changed.length) { showToast('Ничего не изменилось'); return; }
+
+            el('saveBtn').disabled = true;
+            try {
+                const res = await api(`/api/tools/${current.id}/update`, { method: 'POST', body: JSON.stringify(patch) });
+                current = res.tool;
+                const idx = tools.findIndex(t => t.id === current.id);
+                tools[idx] = current;
+                drawList();
+                fill(current);
+                loadHistory();
+                showToast(`Сохранено: ${res.updated.join(', ')}`);
+            } catch (e) {
+                showToast(e.message || 'Не удалось сохранить');
+            } finally {
+                el('saveBtn').disabled = false;
+            }
+        });
+
+        el('resetBtn').addEventListener('click', () => { if (current) fill(current); });
+
+        el('verifyBtn').addEventListener('click', async () => {
+            try {
+                const res = await api(`/api/tools/${current.id}/verify`, { method: 'POST' });
+                current = res.tool;
+                const idx = tools.findIndex(t => t.id === current.id);
+                tools[idx] = current;
+                drawList();
+                fill(current);
+                showToast('Отмечено как проверенное');
+            } catch (e) { showToast(e.message); }
+        });
+
+        el('refreshBtn').addEventListener('click', load);
+        el('reloadBtn').addEventListener('click', load);
+
+        load();
+    </script>
+</body>
+</html>

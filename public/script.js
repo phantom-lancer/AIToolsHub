@@ -222,6 +222,13 @@ function renderAuth(user) {
             showToast('Вы вышли из аккаунта');
             renderAuth(null);
         });
+
+        // Ссылка на редактор появляется только у админа — проверяем молча
+        fetch('/api/admin/stale', { credentials: 'same-origin' }).then(r => {
+            if (!r.ok) return;
+            authArea.insertAdjacentHTML('afterbegin',
+                '<a class="btn quiet" href="admin.html" title="Редактор каталога" style="padding:0 13px">Правки</a>');
+        }).catch(() => { });
     } else {
         authArea.innerHTML = `
             <button class="btn quiet" id="loginBtn">Войти</button>
@@ -426,6 +433,44 @@ quizRoot.addEventListener('click', e => {
 addEventListener('keydown', e => {
     if (e.key === 'Escape' && quizRoot.classList.contains('is-open')) closeQuiz();
 });
+
+/* ---------- нижняя навигация: подсветка активного раздела ---------- */
+const tabbarLinks = [...document.querySelectorAll('.tabbar a')];
+const sectionIds = ['catalog', 'daily', 'community'];
+
+if (tabbarLinks.length && 'IntersectionObserver' in window) {
+    const markActive = id => {
+        tabbarLinks.forEach(a => {
+            const isOn = a.getAttribute('href') === '#' + id
+                || (a.getAttribute('href') === '#catalog' && id === 'catalog');
+            if (a.hasAttribute('aria-current')) {
+                if (isOn) a.setAttribute('aria-current', 'page');
+                else a.removeAttribute('aria-current');
+            }
+        });
+    };
+
+    const seen = new Set();
+    const spy = new IntersectionObserver(entries => {
+        entries.forEach(e => {
+            if (e.isIntersecting) seen.add(e.target.id);
+            else seen.delete(e.target.id);
+        });
+        // из видимых берём самый верхний по документу
+        const visible = sectionIds.filter(id => seen.has(id));
+        if (visible.length) markActive(visible[0]);
+    }, { rootMargin: '-45% 0px -50% 0px', threshold: 0 });
+
+    sectionIds.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) spy.observe(el);
+    });
+
+    tabbarLinks.forEach(a => a.addEventListener('click', () => {
+        const id = a.getAttribute('href').replace('#', '');
+        if (sectionIds.includes(id)) markActive(id);
+    }));
+}
 
 /* ---------- стек-билдер ---------- */
 let builderCat = 'code';
