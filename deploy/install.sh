@@ -1,11 +1,15 @@
 #!/usr/bin/env bash
-# Установка AI Tools Hub на Debian 13. Запускать из клонированного репозитория.
+# Установка AI Tools Hub на Debian 13.
 #   git clone https://github.com/phantom-lancer/AIToolsHub.git
 #   cd AIToolsHub && chmod +x deploy/install.sh && sudo ./deploy/install.sh
+#
+# Проект копируется в /opt/ai-tools-hub, а не остаётся там, где его клонировали:
+# сервис работает с ProtectHome=true и не имеет доступа к /root и /home.
 set -euo pipefail
 
 APP_NAME="ai-tools-hub"
-SRC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+APP_DIR="/opt/ai-tools-hub"
+CLONE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 NODE_MAJOR="24"
 
 log() { printf '\n\033[1;34m==> %s\033[0m\n' "$1"; }
@@ -17,15 +21,21 @@ if ! command -v node >/dev/null 2>&1 || [ "$(node -p 'process.versions.node.spli
 fi
 echo "node $(node --version), npm $(npm --version)"
 
-log "2/7 Ставим зависимости в ${SRC_DIR}"
-cd "$SRC_DIR"
+log "2/7 Копируем проект в ${APP_DIR}"
+# Если скрипт уже лежит в /opt (повторный запуск) — обновляем на месте
+if [ "$CLONE_DIR" = "$APP_DIR" ]; then
+    APP_DIR="$CLONE_DIR"
+else
+    mkdir -p "$APP_DIR"
+    cp -a "$CLONE_DIR/." "$APP_DIR/"
+fi
+cd "$APP_DIR"
 rm -rf node_modules
 npm ci --omit=dev 2>/dev/null || npm install --omit=dev
 
-log "3/7 Права: процесс будет работать от www-data, БД должна быть доступна на запись"
-chown -R www-data:www-data "$SRC_DIR"
-# SQLite создаёт database.db рядом с server.js — нужен каталог на запись
-chmod 750 "$SRC_DIR"
+log "3/7 Права: процесс работает от www-data, каталог с БД должен быть на запись"
+chown -R www-data:www-data "$APP_DIR"
+chmod 750 "$APP_DIR"
 
 log "4/7 systemd-юнит"
 cat > /etc/systemd/system/${APP_NAME}.service <<UNIT
@@ -37,12 +47,11 @@ Wants=network-online.target
 [Service]
 Type=simple
 User=www-data
-WorkingDirectory=${SRC_DIR}
+WorkingDirectory=${APP_DIR}
 ExecStart=/usr/bin/node server.js
 Restart=always
 RestartSec=5
 
-# Потолок памяти, чтобы процесс не съел VPS
 MemoryMax=512M
 LimitNOFILE=8192
 
@@ -50,6 +59,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=full
 ProtectHome=true
+ReadWritePaths=${APP_DIR}
 
 StandardOutput=journal
 StandardError=journal
@@ -62,8 +72,21 @@ UNIT
 systemctl daemon-reload
 systemctl enable "${APP_NAME}"
 systemctl restart "${APP_NAME}"
-sleep 5
-systemctl --no-pager --lines=8 status "${APP_NAME}" || true
+
+# Подождём и убедимся, что сервис действительно поднялся, а не ушёл в рестарт
+for i in $(seq 1 15); do
+    if curl -fsS http://127.0.0.1:3000/api/tools > /dev/null 2>&1; then
+        echo "Сервис отвечает."
+        break
+    fi
+    sleep 2
+done
+
+if ! curl -fsS http://127.0.0.1:3000/api/tools > /dev/null 2>&1; then
+    echo "Сервис не поднялся, логи:"
+    journalctl -u "${APP_NAME}" -n 40 --no-pager
+    exit 1
+fi
 
 log "5/7 nginx как reverse proxy на порт 80"
 apt-get install -y nginx
@@ -81,31 +104,31 @@ server {
     location / {
         proxy_pass http://127.0.0.1:3000;
         proxy_http_version 1.1;
-        proxy_set_header Host              \$host;
-        proxy_set_header X-Real-IP         \$remote_addr;
-        proxy_set_header X-Forwarded-For   \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
         proxy_read_timeout 30s;
     }
 }
 NGINX
 
-ln -sf /etc/nginx/sites-available/${APP_NAME}" /etc/nginx/sites-enabled/${APP_NAME}
+ln -sf "/etc/nginx/sites-available/${APP_NAME}" "/etc/nginx/sites-enabled/${APP_NAME}"
 rm -f /etc/nginx/sites-enabled/default
 nginx -t
 systemctl reload nginx
 
-log "6/7 Проверка"
+log "6/7 Проверка через nginx"
 sleep 2
-if curl -fsS http://127.0.0.1:3000/api/tools > /dev/null; then
-    echo "API отвечает — сайт работает."
+if curl -fsS http://127.0.0.1/api/tools > /dev/null; then
+    echo "nginx отвечает, сайт работает."
 else
-    echo "Не отвечает, логи:"
-    journalctl -u "${APP_NAME}" -n 40 --no-pager
+    echo "nginx не отвечает:"
+    tail -n 20 /var/log/nginx/ai-tools-hub.error.log || true
     exit 1
 fi
 
-IP="$(curl -fsS ifconfig.me 2>/dev/null || hostname -I | awk '{print $1}')"
+IP="$(curl -fsS ifconfig.me 2>/dev/null || hostname -I 2>/dev/null | awk '{print $1}')"
 cat <<DONE
 
 ────────────────────────────────────────────
@@ -113,11 +136,11 @@ cat <<DONE
 
     http://${IP}
 
-Проверить:        curl http://127.0.0.1/api/tools
-Логи:            journalctl -u ${APP_NAME} -f
-Перезапуск:      sudo systemctl restart ${APP_NAME}
-Остановить:      sudo systemctl stop ${APP_NAME}
-Проект:           ${SRC_DIR}
-База данных:     ${SRC_DIR}/database.db
+Проверить:     curl http://127.0.0.1/api/tools
+Логи:         journalctl -u ${APP_NAME} -f
+Перезапуск:   systemctl restart ${APP_NAME}
+Остановить:   systemctl stop ${APP_NAME}
+Проект:       ${APP_DIR}
+База данных:  ${APP_DIR}/database.db
 ────────────────────────────────────────────
 DONE

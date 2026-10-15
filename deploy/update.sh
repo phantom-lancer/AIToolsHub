@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
 # Обновление сайта после изменений в коде.
-#   cd AIToolsHub && git pull && ./deploy/update.sh
+#   cd /opt/ai-tools-hub && git pull && ./deploy/update.sh
 set -euo pipefail
 
 APP_NAME="ai-tools-hub"
-SRC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-cd "$SRC_DIR"
+APP_DIR="/opt/ai-tools-hub"
+cd "$APP_DIR"
 
 echo "==> Зависимости"
 npm install --omit=dev --no-audit --no-fund
 
 echo "==> Права"
-chown -R www-data:www-data "$SRC_DIR"
+chown -R www-data:www-data "$APP_DIR"
 
 echo "==> Перезапуск"
 systemctl restart "${APP_NAME}"
