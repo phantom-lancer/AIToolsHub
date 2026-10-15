@@ -1,141 +1,224 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="ru" data-theme="light" data-mode="auto">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#eef0f4">
     <title>Профиль — AI Tools Hub</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Unbounded:wght@500;700&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="bg-orbs">
-        <div class="orb orb-1"></div>
-        <div class="orb orb-2"></div>
-        <div class="orb orb-3"></div>
-    </div>
-
-    <header class="header">
-        <nav class="nav container">
-            <a href="index.html" class="logo">AI<span>Tools</span>Hub</a>
-            <div style="display:flex;gap:10px;align-items:center">
-                <select class="theme-select" id="themeSelect" title="Тема">
-                    <option value="auto">Авто</option>
-                    <option value="dark">Тёмная</option>
-                    <option value="light">Светлая</option>
-                </select>
-                <a href="index.html" class="btn-ghost">← Главная</a>
-            </div>
-        </nav>
+    <header class="topbar glass">
+        <a class="brand" href="index.html"><span class="dotmark">AI</span>AI Tools Hub</a>
+        <span class="sp"></span>
+        <button class="btn quiet" data-open-cmd title="��������� ������� � ?K">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/></svg>
+            <span class="cmd-hint">?K</span>
+        </button>
+        <button class="theme-toggle" aria-label="Сменить тему">
+            <svg class="i-auto" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.6"/><path d="M12 3.4a8.6 8.6 0 0 1 0 17.2Z" fill="currentColor" stroke="none"/></svg>
+            <svg class="i-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.6v2.2M12 19.2v2.2M2.6 12h2.2M19.2 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6"/></svg>
+            <svg class="i-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 13.2A8.6 8.6 0 0 1 10.8 3a8.6 8.6 0 1 0 10.2 10.2Z"/></svg>
+        </button>
+        <a class="btn" href="index.html">К каталогу</a>
     </header>
 
-    <main class="container section">
-        <h2 class="section-title">Мой профиль</h2>
-        <div id="profileBox" class="card glass" style="max-width:600px;padding:32px">
-            <p style="color:var(--muted)">Загрузка...</p>
-        </div>
+    <main class="wrap hero" style="padding-bottom:24px">
+        <div id="profileBox"></div>
     </main>
 
-    <footer class="footer"><p>© 2026 AI Tools Hub</p></footer>
+    <footer class="wrap footer">
+        <span class="m-label">© 2026 AI Tools Hub</span>
+        <a class="m-label" href="index.html">Вернуться в каталог</a>
+    </footer>
+
+    <div id="toast" aria-live="polite"></div>
+
     <script src="toast.js"></script>
     <script src="theme.js"></script>
     <script src="bg.js"></script>
+    <script src="select.js"></script>
+    <script src="motion-loader.js"></script>
+    <script>window.__motion = null; loadMotion().then(m => window.__motion = m);</script>
+    <script src="transitions.js"></script>
+    <script src="palette.js"></script>
     <script>
-        fetch('/api/me', { credentials: 'same-origin' })
-            .then(r => r.ok ? r.json() : Promise.reject())
-            .then(({ user }) => {
-                document.getElementById('profileBox').innerHTML = `
-                    <div style="display:flex;align-items:center;gap:20px;margin-bottom:24px">
-                        ${user.avatar ? `<img src="${user.avatar}" class="avatar" style="width:64px;height:64px" id="avatarImg">` : `<div class="avatar-initial" style="width:64px;height:64px;font-size:1.6rem" id="avatarImg">${user.username[0].toUpperCase()}</div>`}
-                        <div>
-                            <h3 style="font-size:1.4rem">${user.username}</h3>
-                            <p style="color:var(--muted)">${user.email}</p>
-                        </div>
+        const box = document.getElementById('profileBox');
+        const PENCIL = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9a2.5 2.5 0 0 0-3.5-3.5L4.5 16.5V20Z"/><path d="M14.5 6.5 17.5 9.5"/></svg>';
+
+        const logo = t => `<img src="https://www.google.com/s2/favicons?domain=${t.domain}&sz=128" alt=""
+            onerror="this.outerHTML='<span style=font-weight:650>${t.name[0]}</span>'">`;
+
+        async function loadProfile() {
+            let user;
+            try {
+                ({ user } = await fetch('/api/me', { credentials: 'same-origin' }).then(r => r.ok ? r.json() : Promise.reject()));
+            } catch {
+                box.innerHTML = `
+                    <div class="panel glass" style="padding:32px;text-align:center">
+                        <p>Вы не авторизованы.</p>
+                        <a class="btn primary" href="index.html" style="margin-top:18px">Войти</a>
+                    </div>`;
+                return;
+            }
+
+            const [favorites, stack] = await Promise.all([
+                fetch('/api/favorites', { credentials: 'same-origin' }).then(r => r.json()).catch(() => ({ favorites: [] })),
+                fetch('/api/stack', { credentials: 'same-origin' }).then(r => r.json()).catch(() => ({ stack: [] })),
+            ]);
+
+            const avatarInner = user.avatar
+                ? `<img class="avatar-xl" src="${user.avatar}" alt="">`
+                : `<span class="avatar-xl initial">${user.username[0].toUpperCase()}</span>`;
+
+            box.innerHTML = `
+                <section class="profile-hero">
+                    <label class="avatar-drop" id="avatarDrop" tabindex="0">
+                        ${avatarInner}
+                        <span class="veil">${PENCIL}<span>Сменить фото</span></span>
+                        <input type="file" id="avatarInput" accept="image/*" hidden>
+                    </label>
+
+                    <h1 class="profile-name">
+                        ${user.username}
+                        <svg class="verified" viewBox="0 0 24 24" fill="currentColor" aria-label="Подтверждён"><path d="M12 1.8l2.4 2.1 3.2-.3.9 3.1 2.7 1.8-1.4 2.9 1.4 2.9-2.7 1.8-.9 3.1-3.2-.3L12 21.6l-2.4-2.1-3.2.3-.9-3.1-2.7-1.8 1.4-2.9-1.4-2.9 2.7-1.8.9-3.1 3.2.3L12 1.8Zm-1.2 13.6 5.1-5.1-1.3-1.3-3.8 3.8-1.8-1.8-1.3 1.3 3.1 3.1Z"/></svg>
+                    </h1>
+                    <p class="profile-sub">${user.email} · с нами с ${new Date(user.created_at).toLocaleDateString('ru-RU')}</p>
+
+                    <div class="quick">
+                        <a href="#fav"><b>${favorites.favorites.length}</b><span>избранное</span></a>
+                        <a href="#stack"><b>${stack.stack.length}</b><span>в моём стеке</span></a>
+                        <a href="index.html#builder"><b>3</b><span>подборки</span></a>
                     </div>
-                    <p style="color:var(--muted)">Дата регистрации: ${new Date(user.created_at).toLocaleDateString('ru-RU')}</p>
-                    <p style="color:var(--muted)">ID пользователя: #${user.id}</p>
-                    <div style="margin-top:20px">
-                        <p style="margin-bottom:8px">Аватар:</p>
-                        <input type="file" id="avatarInput" accept="image/*" style="color:var(--muted)">
-                        <p id="avatarMsg" style="color:var(--muted);font-size:.85rem;min-height:1.2em"></p>
-                    </div>
-                    <button class="btn-ghost" style="margin-top:20px" onclick="logout()">Выйти из аккаунта</button>
-                `;
-                document.getElementById('avatarInput').addEventListener('change', e => {
-                    const file = e.target.files[0];
-                    if (!file) return;
-                    if (file.size > 1.2 * 1024 * 1024) {
-                        document.getElementById('avatarMsg').textContent = 'Файл слишком большой (макс 1.2 МБ)';
-                        return;
-                    }
-                    const reader = new FileReader();
-                    reader.onload = async () => {
-                        const res = await fetch('/api/avatar', {
-                            method: 'POST', credentials: 'same-origin',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ avatar: reader.result }),
-                        });
-                        document.getElementById('avatarMsg').textContent = res.ok ? 'Аватар обновлён ✓' : 'Ошибка загрузки';
-                        if (res.ok) {
-                            const img = document.createElement('img');
-                            img.id = 'avatarImg'; img.src = reader.result; img.className = 'avatar'; img.style.width = '64px'; img.style.height = '64px';
-                            document.getElementById('avatarImg').replaceWith(img);
-                        }
-                    };
-                    reader.readAsDataURL(file);
-                });
-            })
-            .catch(() => {
-                document.getElementById('profileBox').innerHTML = '<p>Вы не авторизованы. <a href="index.html" style="color:var(--accent2)">Войти</a></p>';
+                </section>
+
+                <div class="phead" id="fav">
+                    <h2>Избранное</h2>
+                    <span class="m-label">${favorites.favorites.length} инструментов</span>
+                </div>
+                <div class="gal" id="favGal"></div>
+
+                <div class="phead" id="stack">
+                    <h2>Мой стек</h2>
+                    <span class="m-label" id="stackMeta"></span>
+                </div>
+                <div class="gal" id="stackGal"></div>
+
+                <div class="phead"><h2>Данные</h2></div>
+                <div class="panel glass" style="padding:18px;display:flex;gap:10px;flex-wrap:wrap">
+                    <button class="btn" id="exportBtn">Экспорт закладок</button>
+                    <button class="btn" id="importBtn">Импорт закладок</button>
+                    <input type="file" id="importFile" accept=".json,application/json" hidden>
+                    <span class="m-label" style="align-self:center">файл JSON с вашими инструментами</span>
+                </div>
+
+                <div style="display:flex;justify-content:center;margin-top:28px">
+                    <button class="btn" id="logoutBtn">Выйти из аккаунта</button>
+                </div>`;
+
+            const favGal = document.getElementById('favGal');
+            favGal.innerHTML = favorites.favorites.length
+                ? favorites.favorites.map(t => `
+                    <a class="tile" href="tool.html?id=${t.id}">
+                        <span class="mark">${logo(t)}</span>
+                        <b>${t.name}</b>
+                        <small>${t.domain}</small>
+                    </a>`).join('')
+                : '<p class="empty" style="padding:18px">Пока пусто. Нажмите на звезду на странице инструмента.</p>';
+
+            const stackGal = document.getElementById('stackGal');
+            stackGal.innerHTML = stack.stack && stack.stack.length
+                ? stack.stack.map(t => `
+                    <a class="tile" href="tool.html?id=${t.id}">
+                        <span class="mark">${logo(t)}</span>
+                        <b>${t.name}</b>
+                        <small>★ ${t.rating}</small>
+                    </a>`).join('')
+                : '<p class="empty" style="padding:18px">Стек не собран. Соберите его в стек-билдере на главной.</p>';
+            document.getElementById('stackMeta').textContent = stack.updatedAt
+                ? 'обновлён ' + new Date(stack.updatedAt).toLocaleString('ru-RU')
+                : '';
+
+            /* ---------- аватар: наведение и перетаскивание ---------- */
+            const drop = document.getElementById('avatarDrop');
+            const input = document.getElementById('avatarInput');
+            drop.addEventListener('click', () => input.click());
+            drop.addEventListener('keydown', e => {
+                if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input.click(); }
+            });
+            ['dragenter', 'dragover'].forEach(ev => drop.addEventListener(ev, e => {
+                e.preventDefault(); drop.classList.add('drag');
+            }));
+            ['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, e => {
+                e.preventDefault(); drop.classList.remove('drag');
+            }));
+            drop.addEventListener('drop', e => upload(e.dataTransfer.files[0]));
+            input.addEventListener('change', e => upload(e.target.files[0]));
+
+            async function upload(file) {
+                if (!file) return;
+                if (!file.type.startsWith('image/')) { showToast('Нужен файл изображения'); return; }
+                if (file.size > 1.2 * 1024 * 1024) { showToast('Файл больше 1,2 МБ — выберите поменьше'); return; }
+                const reader = new FileReader();
+                reader.onload = async () => {
+                    const r = await fetch('/api/avatar', {
+                        method: 'POST', credentials: 'same-origin',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ avatar: reader.result }),
+                    });
+                    if (!r.ok) { showToast('Не удалось загрузить изображение'); return; }
+                    const img = document.createElement('img');
+                    img.className = 'avatar-xl';
+                    img.src = reader.result;
+                    img.alt = '';
+                    document.querySelector('.avatar-drop .avatar-xl').replaceWith(img);
+                    showToast('Аватар обновлён');
+                };
+                reader.readAsDataURL(file);
+            }
+
+            document.getElementById('logoutBtn').addEventListener('click', async () => {
+                await fetch('/api/logout', { method: 'POST', credentials: 'same-origin' });
+                showToast('Вы вышли из аккаунта');
+                location.href = 'index.html';
             });
 
-        fetch('/api/favorites', { credentials: 'same-origin' }).then(r => r.ok ? r.json() : null).then(data => {
-            if (!data) return;
-            const box = document.createElement('div');
-            box.style.marginTop = '24px';
-            box.innerHTML = '<h3 style="margin-bottom:12px">Избранные инструменты</h3>' +
-                (data.favorites.length
-                    ? data.favorites.map(t => `<a href="tool.html?id=${t.id}" style="display:inline-block;margin:0 8px 8px 0;padding:8px 16px;border-radius:50px;text-decoration:none;color:var(--text);background:var(--card);border:1px solid var(--border)">${t.name} ★ ${t.rating}</a>`).join('')
-                    : '<p style="color:var(--muted)">Пока пусто — добавляйте сердечком на странице инструмента.</p>') +
-                `<div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap">
-                    <button class="btn-ghost" id="exportBtn">📤 Экспорт в JSON</button>
-                    <label class="btn-ghost" style="cursor:pointer">📥 Импорт JSON<input type="file" id="importFile" accept=".json" hidden></label>
-                </div>
-                <p id="ioMsg" style="color:var(--muted);font-size:.85rem;min-height:1.2em"></p>`;
-            box.querySelector('#exportBtn').addEventListener('click', () => {
-                const blob = new Blob([JSON.stringify({ favorites: data.favorites.map(t => t.id) }, null, 2)], { type: 'application/json' });
+            document.getElementById('exportBtn').addEventListener('click', () => {
+                const blob = new Blob([JSON.stringify({ favorites: favorites.favorites.map(t => t.id) }, null, 2)], { type: 'application/json' });
                 const a = document.createElement('a');
                 a.href = URL.createObjectURL(blob);
                 a.download = 'ai-tools-favorites.json';
                 a.click();
-                showToast('Закладки экспортированы 📤');
+                showToast('Закладки выгружены');
             });
-            box.querySelector('#importFile').addEventListener('change', e => {
+
+            document.getElementById('importBtn').addEventListener('click', () => document.getElementById('importFile').click());
+            document.getElementById('importFile').addEventListener('change', e => {
                 const file = e.target.files[0];
                 if (!file) return;
                 const reader = new FileReader();
                 reader.onload = async () => {
                     try {
                         const parsed = JSON.parse(reader.result);
-                        const ids = parsed.favorites || parsed;
-                        const res = await fetch('/api/favorites/import', {
+                        const ids = Array.isArray(parsed) ? parsed : parsed.favorites;
+                        const r = await fetch('/api/favorites/import', {
                             method: 'POST', credentials: 'same-origin',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ toolIds: ids }),
                         });
-                        const d = await res.json();
-                        box.querySelector('#ioMsg').textContent = res.ok ? `Импортировано: ${d.imported} ✓` : (d.error || 'Ошибка');
-                        if (res.ok) { showToast(`Импортировано ${d.imported} закладок 📥`); setTimeout(() => location.reload(), 800); }
-                    } catch { box.querySelector('#ioMsg').textContent = 'Неверный JSON-файл'; }
+                        const d = await r.json();
+                        if (r.ok) { showToast(`Импортировано: ${d.imported}`); setTimeout(loadProfile, 700); }
+                        else showToast(d.error || 'Не удалось импортировать');
+                    } catch { showToast('Файл повреждён или это не JSON'); }
                 };
                 reader.readAsText(file);
             });
-            document.getElementById('profileBox').appendChild(box);
-        });
-
-        function logout() {
-            fetch('/api/logout', { method: 'POST', credentials: 'same-origin' })
-                .then(() => location.href = 'index.html');
         }
+
+        loadProfile();
     </script>
 </body>
 </html>

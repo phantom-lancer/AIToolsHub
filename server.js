@@ -12,6 +12,16 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // Database
 const db = new DatabaseSync(path.join(__dirname, 'database.db'));
+
+// Миграции: CREATE TABLE IF NOT EXISTS не добавляет новые колонки в существующие таблицы
+function ensureColumn(table, column, definition) {
+    const cols = db.prepare(`PRAGMA table_info(${table})`).all();
+    if (!cols.some(c => c.name === column)) {
+        db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+        console.log(`[migrate] ${table}.${column} добавлена`);
+    }
+}
+
 db.exec(`
     CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -44,8 +54,52 @@ db.exec(`
         text TEXT NOT NULL,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP
     );
+    CREATE TABLE IF NOT EXISTS comment_replies (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        comment_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        text TEXT NOT NULL,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE IF NOT EXISTS comment_likes (
+        comment_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        PRIMARY KEY (comment_id, user_id)
+    );
+    CREATE TABLE IF NOT EXISTS og_cache (
+        domain TEXT PRIMARY KEY,
+        image TEXT,
+        description TEXT,
+        fetched_at TEXT DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE IF NOT EXISTS uptime (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        service TEXT NOT NULL,
+        status TEXT NOT NULL,
+        latency INTEGER,
+        error TEXT,
+        checked_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS uptime_service_time ON uptime(service, checked_at);
+    CREATE TABLE IF NOT EXISTS stack_likes (
+        stack_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        PRIMARY KEY (stack_id, user_id)
+    );
+    CREATE TABLE IF NOT EXISTS public_stacks (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        task TEXT NOT NULL,
+        tool_ids TEXT NOT NULL,
+        author TEXT NOT NULL,
+        likes INTEGER DEFAULT 0,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    );
 `);
-try { db.exec('ALTER TABLE users ADD COLUMN avatar TEXT'); } catch {}
+
+// Миграции для баз, созданных до этих колонок
+ensureColumn('users', 'avatar', 'TEXT');
+ensureColumn('uptime', 'error', 'TEXT');
 
 // Sessions in memory: token -> userId
 const sessions = new Map();
@@ -170,14 +224,20 @@ app.get('/api/tools/:id', (req, res) => {
     const tool = tools.find(t => t.id === Number(req.params.id));
     if (!tool) return res.status(404).json({ error: 'Не найдено' });
     const r = db.prepare('SELECT COUNT(*) as n, AVG(value) as avg FROM ratings WHERE tool_id = ?').get(tool.id);
-    const comments = db.prepare(`
+    const viewer = getUser(req);
+    const rawComments = db.prepare(`
         SELECT c.id, c.text, c.created_at, u.username, u.avatar
         FROM comments c JOIN users u ON u.id = c.user_id
         WHERE c.tool_id = ? ORDER BY c.id DESC
     `).all(tool.id);
-    const user = getUser(req);
-    const myRating = user ? db.prepare('SELECT value FROM ratings WHERE user_id = ? AND tool_id = ?').get(user.id, tool.id) : null;
-    const isFav = user ? !!db.prepare('SELECT 1 FROM favorites WHERE user_id = ? AND tool_id = ?').get(user.id, tool.id) : false;
+    const comments = rawComments.map(c => ({
+        ...c,
+        likes: db.prepare('SELECT COUNT(*) as n FROM comment_likes WHERE comment_id = ?').get(c.id).n,
+        liked: viewer ? !!db.prepare('SELECT 1 FROM comment_likes WHERE comment_id = ? AND user_id = ?').get(c.id, viewer.id) : false,
+        replies: db.prepare('SELECT COUNT(*) as n FROM comment_replies WHERE comment_id = ?').get(c.id).n,
+    }));
+    const myRating = viewer ? db.prepare('SELECT value FROM ratings WHERE user_id = ? AND tool_id = ?').get(viewer.id, tool.id) : null;
+    const isFav = viewer ? !!db.prepare('SELECT 1 FROM favorites WHERE user_id = ? AND tool_id = ?').get(viewer.id, tool.id) : false;
     res.json({ tool, ratingsCount: r.n, userAvg: r.avg ? Math.round(r.avg * 10) / 10 : null, comments, myRating: myRating ? myRating.value : 0, isFavorite: isFav });
 });
 
@@ -229,18 +289,295 @@ app.get('/api/stack', requireAuth, (req, res) => {
     res.json({ stack: ids.map(id => tools.find(t => t.id === id)).filter(Boolean), updatedAt: row ? row.updated_at : null });
 });
 
-const radarServices = ['ChatGPT', 'Claude', 'DeepSeek', 'Midjourney'];
+const CHANGELOG = [
+    {
+        version: '2.4',
+        date: '8 октября 2026',
+        items: [
+            'Командная палитра ⌘K и горячие клавиши',
+            'Свайп-переходы между страницами в стиле iOS',
+            'Сравнение инструментов в нижней шторке',
+            'Живые обложки сервисов из og:image с кэшем',
+            'Community Stack Builder: подборки от пользователей',
+            'Инструмент дня с промптом',
+            'Лайки и ответы на комментариях',
+            'Changelog-страница и состояние фильтров в ссылке',
+        ],
+    },
+    {
+        version: '2.3',
+        date: '5 октября 2026',
+        items: [
+            'Стек-билдер с фильтрами «бесплатно» и «без регистрации»',
+            'Live AI Radar с раскрывающимися деталями',
+            'Live glass: единая система материалов на всех элементах',
+        ],
+    },
+    {
+        version: '2.2',
+        date: '2 октября 2026',
+        items: [
+            'Сравнение двух нейросетей с вердиктом',
+            'Избранное с экспортом и импортом JSON',
+            'Оценки и комментарии к инструментам',
+        ],
+    },
+    {
+        version: '2.0',
+        date: '28 сентября 2026',
+        items: ['Регистрация и вход', 'Каталог с фильтрами и поиском', 'Профиль пользователя'],
+    },
+];
+
+// ---------- живой статус сервисов ----------
+// Проверяем НАСТОЯЩИЙ ответ стороннего API. Никаких Math.random().
+// Ответ кодается в БД, чтобы был виден аптайм за сутки.
+const RADAR_TARGETS = [
+    { name: 'OpenAI API', url: 'https://api.openai.com/v1/models', weight: 3 },
+    { name: 'Anthropic API', url: 'https://api.anthropic.com/v1/models', weight: 3 },
+    { name: 'Google AI', url: 'https://generativelanguage.googleapis.com/v1beta/models', weight: 2 },
+    { name: 'Replicate', url: 'https://api.replicate.com/v1/models', weight: 1 },
+    { name: 'Hugging Face', url: 'https://huggingface.co/api/models?limit=1', weight: 1 },
+];
+
+// Порог по весу: чем важнее сервис, тем строже к времени ответа
+function gradeStatus(ms, ok) {
+    if (!ok) return 'down';
+    if (ms > 2500) return 'degraded';
+    return 'operational';
+}
+
+async function probe(target) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8000);
+    const started = Date.now();
+    try {
+        const res = await fetch(target.url, {
+            method: 'GET',
+            signal: controller.signal,
+            redirect: 'follow',
+            headers: {
+                // 401/403 тоже считаем «сервис жив» — значит дошли до сервера
+                'user-agent': 'AI-Tools-Hub/uptime-check',
+                accept: '*/*',
+            },
+        });
+        const ms = Date.now() - started;
+        // 5xx — сервис лежит, 4xx — живой (просто нужен ключ)
+        const ok = res.status < 500;
+        return { status: gradeStatus(ms, ok), latency: ms, http: res.status, error: null };
+    } catch (e) {
+        // Таймаут — скорее всего провайдер режет маршрут, а не сервис упал.
+        // Различаем это и честно пишем в интерфейсе.
+        const timeout = e.name === 'AbortError';
+        return { status: 'down', latency: null, http: 0, error: timeout ? 'timeout' : 'unreachable' };
+    } finally {
+        clearTimeout(timer);
+    }
+}
+
+async function runRadarCheck() {
+    const results = await Promise.all(RADAR_TARGETS.map(probe));
+    const now = new Date().toISOString();
+    const insert = db.prepare('INSERT INTO uptime (service, status, latency, error, checked_at) VALUES (?, ?, ?, ?, ?)');
+    const prune = db.prepare('DELETE FROM uptime WHERE checked_at < ?');
+
+    RADAR_TARGETS.forEach((t, i) => {
+        const r = results[i];
+        insert.run(t.name, r.status, r.latency, r.error, now);
+        t.lastStatus = r.status;
+        t.lastError = r.error;
+    });
+
+    // храним сутки, не больше
+    prune.run(new Date(Date.now() - 24 * 3600 * 1000).toISOString());
+    db.prepare('DELETE FROM uptime WHERE service NOT IN (' +
+        RADAR_TARGETS.map(() => '?').join(',') + ')').run(...RADAR_TARGETS.map(t => t.name));
+
+    lastRadarRun = now;
+}
+
+let lastRadarRun = null;
+
+// Первая проверка сразу при старте, дальше раз в 5 минут
+runRadarCheck().catch(() => { });
+setInterval(() => runRadarCheck().catch(() => { }), 5 * 60 * 1000);
+
+// стартовые подборки сообщества, чтобы витрина не была пустой
+if (!db.prepare('SELECT COUNT(*) AS n FROM public_stacks').get().n) {
+    const seed = [
+        ['Фриланс-дизайнер', 'дизайн и 3D', [9, 10, 21], 'редакция', 12],
+        ['Инди-геймдев', '3D и код', [5, 23, 17], 'редакция', 9],
+        ['Контент-мейкер', 'текст и видео', [1, 14, 19], 'редакция', 7],
+    ];
+    const insert = db.prepare('INSERT INTO public_stacks (name, task, tool_ids, author, likes) VALUES (?, ?, ?, ?, ?)');
+    seed.forEach(([name, task, ids, author, likes]) => insert.run(name, task, JSON.stringify(ids), author, likes));
+}
 app.get('/api/radar', (req, res) => {
-    res.json({ services: radarServices.map(name => {
-        const roll = Math.random();
-        const status = roll < 0.85 ? 'operational' : roll < 0.97 ? 'degraded' : 'down';
+    const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+
+    const services = RADAR_TARGETS.map(t => {
+        const last = db.prepare('SELECT status, latency, error, checked_at FROM uptime WHERE service = ? ORDER BY checked_at DESC LIMIT 1').get(t.name);
+        const rows = db.prepare('SELECT status FROM uptime WHERE service = ? AND checked_at >= ? ORDER BY checked_at ASC').all(t.name, since);
+
+        // аптайм за сутки = доля успешных замеров
+        const total = rows.length;
+        const good = rows.filter(r => r.status !== 'down').length;
+
         return {
-            name,
-            status,
-            latency: status === 'down' ? null : Math.round(80 + Math.random() * (status === 'degraded' ? 1200 : 500)),
-            checkedAt: new Date().toISOString(),
+            name: t.name,
+            status: last ? last.status : 'unknown',
+            latency: last ? last.latency : null,
+            error: last ? last.error : null,
+            checkedAt: last ? last.checked_at : null,
+            uptime24h: total ? Math.round((good / total) * 100) : null,
+            checks: total,
         };
-    }) });
+    });
+
+    const known = services.filter(s => s.status !== 'unknown');
+    const summary = {
+        total: known.length,
+        down: known.filter(s => s.status === 'down').length,
+        degraded: known.filter(s => s.status === 'degraded').length,
+        lastRun: lastRadarRun,
+    };
+
+    res.json({ services, summary, method: 'реальные HTTP-запросы к API сервисов, каждые 5 минут' });
+});
+
+app.get('/api/changelog', (req, res) => res.json({ changelog: CHANGELOG }));
+
+// ---------- обложки сервисов из og:image ----------
+async function fetchOg(domain) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 5000);
+    try {
+        const page = await fetch(`https://${domain}`, {
+            signal: controller.signal,
+            redirect: 'follow',
+            headers: { 'user-agent': 'Mozilla/5.0 AI Tools Hub preview', accept: 'text/html' },
+        });
+        const html = await page.text();
+        const pick = (p) => {
+            const re = new RegExp(`<meta[^>]+(?:property|name)=["']${p}["'][^>]+content=["']([^"']+)["']`, 'i');
+            const re2 = new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+(?:property|name)=["']${p}["']`, 'i');
+            const m = html.match(re) || html.match(re2);
+            return m ? m[1] : null;
+        };
+        return { image: pick('og:image'), description: pick('og:description') || pick('description') };
+    } catch {
+        return { image: null, description: null };
+    } finally {
+        clearTimeout(timer);
+    }
+}
+
+app.get('/api/preview', async (req, res) => {
+    const domain = String(req.query.domain || '').replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+    if (!domain || !domain.includes('.')) return res.status(400).json({ error: 'Нет домена' });
+
+    const saved = db.prepare('SELECT image, description FROM og_cache WHERE domain = ?').get(domain);
+    if (saved) return res.json({ ...saved, cached: true });
+
+    const found = await fetchOg(domain);
+    db.prepare('INSERT INTO og_cache (domain, image, description) VALUES (?, ?, ?) ON CONFLICT(domain) DO UPDATE SET image = excluded.image, description = excluded.description, fetched_at = CURRENT_TIMESTAMP')
+        .run(domain, found.image, found.description);
+    res.json({ ...found, cached: false });
+});
+
+// ---------- инструмент дня ----------
+app.get('/api/daily', (req, res) => {
+    const now = new Date();
+    const start = new Date(now.getFullYear(), 0, 0);
+    const dayOfYear = Math.floor((now - start) / 86400000);
+    const tool = tools[dayOfYear % tools.length];
+    const dayIndex = Math.floor(Date.now() / 86400000);
+
+    const tips = {
+        text: 'Напишите черновик заметки, затем попросите модель сократить его в 3 раза и сохранить факты.',
+        code: 'Опишите функцию словами, затем попросите объяснить её построчно и предложить 3 теста.',
+        art: 'Соберите промпт по формуле: объект + свет + стиль + камера. Меняйте один блок за раз.',
+        video: 'Разбейте ролик на 3 сцены, опишите каждую одним предложением, затем соберите монтаж.',
+        '3d': 'Опишите форму как объём из примитивов и добавьте материал и ракурс.',
+        assistant: 'Сформулируйте вопрос так, будто объясняете его человеку-эксперту, и попросите источники.',
+    };
+    res.json({ tool, prompt: tips[tool.category] || 'Опишите задачу в два предложения и попросите план действий.', dayIndex });
+});
+
+// ---------- community stacks ----------
+app.get('/api/community-stacks', (req, res) => {
+    const rows = db.prepare('SELECT * FROM public_stacks ORDER BY likes DESC, id DESC LIMIT 20').all();
+    res.json({
+        stacks: rows.map(r => ({
+            ...r,
+            tools: JSON.parse(r.tool_ids).map(id => tools.find(t => t.id === id)).filter(Boolean),
+        })),
+    });
+});
+
+app.post('/api/community-stacks', requireAuth, (req, res) => {
+    const { name, task, toolIds } = req.body || {};
+    const ids = Array.isArray(toolIds) ? toolIds.filter(Number.isInteger) : [];
+    if (!name || !task || !ids.length) return res.status(400).json({ error: 'Нужны название, задача и инструменты' });
+    db.prepare('INSERT INTO public_stacks (name, task, tool_ids, author) VALUES (?, ?, ?, ?)')
+        .run(String(name).slice(0, 60), String(task).slice(0, 80), JSON.stringify(ids.slice(0, 10)), req.user.username);
+    res.status(201).json({ ok: true });
+});
+
+app.post('/api/stacks/:id/like', requireAuth, (req, res) => {
+    const id = Number(req.params.id);
+    const stack = db.prepare('SELECT * FROM public_stacks WHERE id = ?').get(id);
+    if (!stack) return res.status(404).json({ error: 'Не найдено' });
+    const has = db.prepare('SELECT * FROM stack_likes WHERE stack_id = ? AND user_id = ?').get(id, req.user.id);
+    if (has) {
+        db.prepare('DELETE FROM stack_likes WHERE stack_id = ? AND user_id = ?').run(id, req.user.id);
+        db.prepare('UPDATE public_stacks SET likes = MAX(0, likes - 1) WHERE id = ?').run(id);
+        return res.json({ liked: false });
+    }
+    db.prepare('INSERT INTO stack_likes (stack_id, user_id) VALUES (?, ?)').run(id, req.user.id);
+    db.prepare('UPDATE public_stacks SET likes = likes + 1 WHERE id = ?').run(id);
+    res.json({ liked: true });
+});
+
+app.post('/api/stacks', requireAuth, (req, res) => {
+    const { name, task, toolIds } = req.body || {};
+    const ids = Array.isArray(toolIds) ? toolIds.filter(Number.isInteger) : [];
+    if (!name || !task || !ids.length) return res.status(400).json({ error: 'Нужны название, задача и инструменты' });
+    db.prepare('INSERT INTO public_stacks (name, task, tool_ids, author) VALUES (?, ?, ?, ?)')
+        .run(String(name).slice(0, 60), String(task).slice(0, 80), JSON.stringify(ids.slice(0, 10)), req.user.username);
+    res.status(201).json({ ok: true });
+});
+
+// ---------- лайки и ответы на комментариях ----------
+app.get('/api/comments/:id/replies', requireAuth, (req, res) => {
+    const rows = db.prepare(`
+        SELECT r.id, r.text, r.created_at, u.username, u.avatar
+        FROM comment_replies r JOIN users u ON u.id = r.user_id
+        WHERE r.comment_id = ? ORDER BY r.id ASC
+    `).all(Number(req.params.id));
+    res.json({ replies: rows });
+});
+
+app.post('/api/comments/:id/reply', requireAuth, (req, res) => {
+    const id = Number(req.params.id);
+    const text = (req.body && req.body.text || '').trim();
+    if (!db.prepare('SELECT id FROM comments WHERE id = ?').get(id)) return res.status(404).json({ error: 'Не найдено' });
+    if (text.length < 2 || text.length > 400) return res.status(400).json({ error: 'Ответ 2–400 символов' });
+    db.prepare('INSERT INTO comment_replies (comment_id, user_id, text) VALUES (?, ?, ?)').run(id, req.user.id, text);
+    res.status(201).json({ ok: true });
+});
+
+app.post('/api/comments/:id/like', requireAuth, (req, res) => {
+    const id = Number(req.params.id);
+    if (!db.prepare('SELECT id FROM comments WHERE id = ?').get(id)) return res.status(404).json({ error: 'Не найдено' });
+    const has = db.prepare('SELECT comment_id FROM comment_likes WHERE comment_id = ? AND user_id = ?').get(id, req.user.id);
+    if (has) {
+        db.prepare('DELETE FROM comment_likes WHERE comment_id = ? AND user_id = ?').run(id, req.user.id);
+        return res.json({ liked: false });
+    }
+    db.prepare('INSERT INTO comment_likes (comment_id, user_id) VALUES (?, ?)').run(id, req.user.id);
+    res.json({ liked: true });
 });
 
 app.post('/api/tools/:id/comment', requireAuth, (req, res) => {

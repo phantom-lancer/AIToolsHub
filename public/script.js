@@ -4,51 +4,28 @@ const filtersWrap = document.getElementById('filters');
 const emptyMsg = document.getElementById('emptyMsg');
 const authArea = document.getElementById('authArea');
 
-const categoryNames = { text: 'Текст', code: 'Кодинг', art: 'Графика', video: 'Аудио/Видео', '3d': '3D', assistant: 'Ассистенты' };
-const categoryEmoji = { text: '✍️', code: '💻', art: '🎨', video: '🎬', '3d': '🧊', assistant: '🤖' };
+const paymentLabels = {
+    free: 'Бесплатно',
+    freemium: 'Бесплатно с лимитами',
+    paid: 'Платно',
+};
+const categoryLabels = {
+    text: 'Текст', code: 'Кодинг', art: 'Графика',
+    video: 'Аудио и видео', '3d': '3D', assistant: 'Ассистенты',
+};
+const coverGradients = {
+    text: 'linear-gradient(120deg,#6366f1,#0ea5e9)',
+    code: 'linear-gradient(120deg,#0ea5e9,#10b981)',
+    art: 'linear-gradient(120deg,#ec4899,#f59e0b)',
+    video: 'linear-gradient(120deg,#f43f5e,#8b5cf6)',
+    '3d': 'linear-gradient(120deg,#8b5cf6,#22d3ee)',
+    assistant: 'linear-gradient(120deg,#14b8a6,#6366f1)',
+};
 
-const paymentLabels = { free: 'Бесплатно', freemium: 'Freemium', paid: 'Платно' };
 let tools = [];
 let activeFilter = 'all';
 let query = '';
-
-function render() {
-    const payment = document.getElementById('paymentSel').value;
-    const vpn = document.getElementById('vpnSel').value;
-    const sort = document.getElementById('sortSel').value;
-    const q = query.toLowerCase();
-    const filtered = tools.filter(t => {
-        const matchCat = activeFilter === 'all' || t.category === activeFilter;
-        const matchQ = t.name.toLowerCase().includes(q) || t.desc.toLowerCase().includes(q) || (t.tags || []).some(tag => tag.toLowerCase().includes(q));
-        const matchPay = payment === 'all' || t.payment === payment;
-        const matchVpn = vpn === 'all' || t.vpn === vpn;
-        return matchCat && matchQ && matchPay && matchVpn;
-    }).sort((a, b) => sort === 'reviews' ? (b.ratingsCount ?? 0) - (a.ratingsCount ?? 0) : (b.userAvg ?? b.rating) - (a.userAvg ?? a.rating));
-    grid.innerHTML = filtered.map(t => `
-        <a class="card glass" style="display:block;text-decoration:none;color:inherit" href="tool.html?id=${t.id}">
-            <img class="tool-logo" src="https://www.google.com/s2/favicons?domain=${t.domain}&sz=128" alt="${t.name}" onerror="this.outerHTML='&lt;div class=tool-logo logo-fallback&gt;${t.name[0]}&lt;/div&gt;'">
-            <span class="card-badge badge-${t.category}">${categoryNames[t.category]}</span>
-            <span class="card-badge" style="background:rgba(255,255,255,.08);color:var(--muted)">${paymentLabels[t.payment]}</span>
-            <span class="card-badge" style="background:${t.vpn === 'Без VPN' ? 'rgba(52,211,153,.15);color:#34d399' : 'rgba(248,113,113,.15);color:#f87171'}">${t.vpn}</span>
-            <h3>${t.name}</h3>
-            <p>${t.desc}</p>
-            <span class="card-rating">★ ${t.userAvg ?? t.rating}</span>${t.ratingsCount ? ` <small style="color:var(--muted)">(${t.ratingsCount} оценок)</small>` : ''}
-        </a>
-    `).join('');
-    emptyMsg.hidden = filtered.length > 0;
-}
-
-filtersWrap.addEventListener('click', e => {
-    const btn = e.target.closest('.filter-btn');
-    if (!btn) return;
-    filtersWrap.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    activeFilter = btn.dataset.filter;
-    render();
-});
-
-searchInput.addEventListener('input', () => { query = searchInput.value; render(); });
-['paymentSel', 'vpnSel', 'sortSel'].forEach(id => document.getElementById(id).addEventListener('change', render));
+const compare = new Set();
 
 async function api(url, options = {}) {
     const res = await fetch(url, {
@@ -57,35 +34,211 @@ async function api(url, options = {}) {
         ...options,
     });
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.error || 'Ошибка');
+    if (!res.ok) throw new Error(data.error || 'Что-то пошло не так');
     return data;
 }
 
+function logoHtml(t) {
+    return `<img src="https://www.google.com/s2/favicons?domain=${t.domain}&sz=128" alt=""
+        onerror="this.outerHTML='<span style=font-weight:650>${t.name[0]}</span>'">`;
+}
+
+function render() {
+    const payment = document.getElementById('paymentSel').value;
+    const vpn = document.getElementById('vpnSel').value;
+    const sort = document.getElementById('sortSel').value;
+    const q = query.toLowerCase();
+
+    const filtered = tools.filter(t => {
+        const matchCat = activeFilter === 'all' || t.category === activeFilter;
+        const matchQ = t.name.toLowerCase().includes(q)
+            || t.desc.toLowerCase().includes(q)
+            || (t.tags || []).some(tag => tag.toLowerCase().includes(q));
+        const matchPay = payment === 'all' || t.payment === payment;
+        const matchVpn = vpn === 'all' || t.vpn === vpn;
+        return matchCat && matchQ && matchPay && matchVpn;
+    }).sort((a, b) => sort === 'reviews'
+        ? (b.ratingsCount ?? 0) - (a.ratingsCount ?? 0)
+        : (b.userAvg ?? b.rating) - (a.userAvg ?? a.rating));
+
+    grid.innerHTML = filtered.map(t => `
+        <div class="item" data-id="${t.id}">
+            <span class="cover" data-cover="${t.domain}"></span>
+            <span class="cover-fallback" style="background:${coverGradients[t.category]}"></span>
+            <label class="mark" title="Добавить к сравнению">
+                <input type="checkbox" data-compare="${t.id}" style="position:absolute;opacity:0;pointer-events:none">
+                <span style="position:relative;display:grid;place-items:center;width:100%;height:100%">
+                    <img src="https://www.google.com/s2/favicons?domain=${t.domain}&sz=128" alt=""
+                        onerror="this.outerHTML='<span style=font-weight:650>${t.name[0]}</span>'">
+                    <span class="mark-tick" hidden>✓</span>
+                </span>
+            </label>
+            <a class="name-link" href="tool.html?id=${t.id}">
+                <span class="name">${t.name}</span>
+                <span class="host">${t.domain}</span>
+            </a>
+            <span class="desc">${t.desc}</span>
+            <span class="pill">${paymentLabels[t.payment]}</span>
+            <span class="pill ${t.vpn === 'Без VPN' ? 'ok' : 'bad'}">${t.vpn}</span>
+            <span class="rate"><b>${(t.userAvg ?? t.rating).toFixed(1)}</b> · ${t.ratingsCount ?? 0}</span>
+        </div>
+    `).join('');
+
+    emptyMsg.hidden = filtered.length > 0;
+    syncCompareUI();
+    loadCovers(filtered);
+}
+
+/* ---------- обложки из og:image (лениво, в фоне) ---------- */
+const coverObserver = 'IntersectionObserver' in window
+    ? new IntersectionObserver(entries => {
+        entries.forEach(entry => {
+            if (!entry.isIntersecting) return;
+            coverObserver.unobserve(entry.target);
+            fetch('/api/preview?domain=' + entry.target.dataset.cover)
+                .then(r => r.ok ? r.json() : null)
+                .then(data => {
+                    if (!data || !data.image) return;
+                    entry.target.style.backgroundImage = `url("${data.image}")`;
+                    entry.target.closest('.item').classList.add('has-cover');
+                })
+                .catch(() => { });
+        });
+    }, { rootMargin: '120px' })
+    : null;
+
+function loadCovers(list) {
+    if (!coverObserver) return;
+    list.forEach(t => {
+        const el = document.querySelector(`.cover[data-cover="${CSS.escape(t.domain)}"]`);
+        if (el) coverObserver.observe(el);
+    });
+}
+
+/* ---------- шторка сравнения (iOS sheet) ---------- */
+const sheetRoot = document.getElementById('sheetRoot');
+const sheetItems = document.getElementById('sheetItems');
+const sheetCount = document.getElementById('sheetCount');
+const sheetCompare = document.getElementById('sheetCompare');
+
+function syncCompareUI() {
+    grid.querySelectorAll('[data-compare]').forEach(cb => {
+        const on = compare.has(Number(cb.dataset.compare));
+        cb.checked = on;
+        cb.closest('.mark').classList.toggle('is-picked', on);
+        cb.closest('.mark').querySelector('.mark-tick').hidden = !on;
+    });
+
+    const picked = [...compare].map(id => tools.find(t => t.id === id)).filter(Boolean);
+    sheetCount.textContent = `${picked.length} выбрано`;
+    sheetItems.innerHTML = picked.map(t => `
+        <span class="sheet-item">
+            ${t.name}
+            <button data-drop="${t.id}" aria-label="Убрать ${t.name}">×</button>
+        </span>`).join('');
+    sheetCompare.disabled = picked.length < 2;
+
+    if (picked.length) openSheet();
+    else closeSheet();
+}
+
+function openSheet() {
+    sheetRoot.classList.add('is-open');
+    sheetRoot.setAttribute('aria-hidden', 'false');
+    const sheet = sheetRoot.querySelector('.sheet');
+    if (window.__motion) {
+        window.__motion.animate(sheet, { y: [120, 0], opacity: [0, 1], scale: [.98, 1] }, spring());
+    } else {
+        sheet.style.transform = 'translateX(-50%)';
+        sheet.animate([{ transform: 'translateX(-50%) translateY(110%)' }, { transform: 'translateX(-50%) translateY(0)' }], { duration: 320, easing: 'cubic-bezier(.32,.72,0,1)' });
+    }
+}
+function closeSheet() {
+    if (!sheetRoot.classList.contains('is-open')) return;
+    sheetRoot.classList.remove('is-open');
+    sheetRoot.setAttribute('aria-hidden', 'true');
+}
+
+grid.addEventListener('change', e => {
+    const cb = e.target.closest('[data-compare]');
+    if (!cb) return;
+    const id = Number(cb.dataset.compare);
+    if (cb.checked) {
+        if (compare.size >= 3) { cb.checked = false; showToast('Можно сравнить не больше трёх'); return; }
+        compare.add(id);
+    } else compare.delete(id);
+    syncCompareUI();
+});
+
+grid.addEventListener('click', e => {
+    const drop = e.target.closest('[data-drop]');
+    if (drop) { compare.delete(Number(drop.dataset.drop)); syncCompareUI(); return; }
+    if (e.target.closest('.mark')) return;
+    const link = e.target.closest('.name-link');
+    if (link) return;
+});
+
+sheetCompare.addEventListener('click', () => {
+    const ids = [...compare];
+    location.href = 'compare.html?a=' + ids[0] + '&b=' + ids[1] + (ids[2] ? '&c=' + ids[2] : '');
+});
+sheetRoot.querySelectorAll('[data-sheet-close]').forEach(el => el.addEventListener('click', closeSheet));
+addEventListener('keydown', e => { if (e.key === 'Escape') closeSheet(); });
+
+/* ---------- фильтры ---------- */
+filtersWrap.addEventListener('click', e => {
+    const btn = e.target.closest('button');
+    if (!btn) return;
+    filtersWrap.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', 'false'));
+    btn.setAttribute('aria-pressed', 'true');
+    activeFilter = btn.dataset.filter;
+    render();
+    syncUrl();
+});
+searchInput.addEventListener('input', () => { query = searchInput.value; render(); });
+['paymentSel', 'vpnSel', 'sortSel'].forEach(id => document.getElementById(id).addEventListener('change', () => { render(); syncUrl(); }));
+
+/* блик стекла следует за курсором */
+document.querySelectorAll('.panel.glass').forEach(panel => {
+    panel.classList.add('lit');
+    panel.addEventListener('pointermove', e => {
+        const r = panel.getBoundingClientRect();
+        panel.style.setProperty('--mx', (e.clientX - r.left) + 'px');
+        panel.style.setProperty('--my', (e.clientY - r.top) + 'px');
+    });
+});
+
+/* ---------- авторизация ---------- */
 function renderAuth(user) {
     if (user) {
+        const avatar = user.avatar
+            ? `<img class="avatar" style="width:24px;height:24px" src="${user.avatar}" alt="">`
+            : `<span class="avatar-initial" style="width:24px;height:24px;font-size:11px">${user.username[0].toUpperCase()}</span>`;
         authArea.innerHTML = `
-            <span class="user-chip">${user.avatar ? `<img src="${user.avatar}" class="avatar" style="width:22px;height:22px;vertical-align:-6px;margin-right:6px">` : ''}<a href="profile.html" style="color:inherit;text-decoration:none">${user.username}</a></span>
-            <button class="btn-ghost" id="logoutBtn">Выйти</button>
-        `;
+            <a class="btn quiet" href="profile.html" style="padding:0 14px 0 8px;gap:8px">${avatar}${user.username}</a>
+            <button class="btn" id="logoutBtn">Выйти</button>`;
         document.getElementById('logoutBtn').addEventListener('click', async () => {
             await api('/api/logout', { method: 'POST' });
+            showToast('Вы вышли из аккаунта');
             renderAuth(null);
         });
     } else {
         authArea.innerHTML = `
-            <button class="btn-ghost" id="loginBtn">Войти</button>
-            <button class="btn-primary-sm" id="registerBtn">Регистрация</button>
-        `;
+            <button class="btn quiet" id="loginBtn">Войти</button>
+            <button class="btn primary" id="registerBtn">Регистрация</button>`;
         document.getElementById('loginBtn').addEventListener('click', () => openModal('loginModal'));
         document.getElementById('registerBtn').addEventListener('click', () => openModal('registerModal'));
     }
 }
 
-const modals = document.querySelectorAll('.modal');
+/* ---------- модалки ---------- */
 function openModal(id) { document.getElementById(id).hidden = false; }
-modals.forEach(m => {
-    m.querySelector('[data-close]').addEventListener('click', () => m.hidden = true);
-    m.addEventListener('click', e => { if (e.target === m) m.hidden = true; });
+document.querySelectorAll('.modal').forEach(modal => {
+    modal.querySelector('[data-close]').addEventListener('click', () => modal.hidden = true);
+    modal.addEventListener('click', e => { if (e.target === modal) modal.hidden = true; });
+});
+addEventListener('keydown', e => {
+    if (e.key === 'Escape') document.querySelectorAll('.modal:not([hidden])').forEach(m => m.hidden = true);
 });
 
 document.getElementById('loginForm').addEventListener('submit', async e => {
@@ -100,6 +253,7 @@ document.getElementById('loginForm').addEventListener('submit', async e => {
         err.textContent = '';
         f.reset();
         document.getElementById('loginModal').hidden = true;
+        showToast(`С возвращением, ${user.username}`);
         renderAuth(user);
     } catch (ex) { err.textContent = ex.message; }
 });
@@ -116,117 +270,417 @@ document.getElementById('registerForm').addEventListener('submit', async e => {
         err.textContent = '';
         f.reset();
         document.getElementById('registerModal').hidden = true;
+        showToast(`Аккаунт создан: ${user.username}`);
         renderAuth(user);
     } catch (ex) { err.textContent = ex.message; }
 });
 
-async function init() {
-    try {
-        const { tools: t } = await api('/api/tools');
-        tools = t;
-        render();
-    } catch { grid.innerHTML = '<p class="empty">Не удалось загрузить инструменты</p>'; }
-
-    try {
-        const { user } = await api('/api/me');
-        renderAuth(user);
-    } catch { renderAuth(null); }
-}
-
-renderAuth(null);
-init();
-
+/* ---------- случайный инструмент ---------- */
 document.getElementById('luckyBtn').addEventListener('click', async () => {
-    const res = await fetch('/api/tools');
-    const { tools } = await res.json();
-    const t = tools[Math.floor(Math.random() * tools.length)];
+    const { tools: all } = await api('/api/tools');
+    const t = all[Math.floor(Math.random() * all.length)];
     location.href = 'tool.html?id=' + t.id;
 });
 
-// Smart AI Stack Builder
+/* =========================================================
+   Подбор под задачу: 2 шага вопросов → 3 инструмента
+   ========================================================= */
+const QUIZ = [
+    {
+        q: 'Что тебе нужно сделать?',
+        hint: 'Выбери задачу — покажу три подходящих инструмента.',
+        key: 'task',
+        options: [
+            { v: 'code', em: '</>', t: 'Написать или починить код', to: 'code' },
+            { v: 'art', em: '◐', t: 'Нарисовать картинку или логотип', to: 'art' },
+            { v: 'video', em: '▶', t: 'Сделать видео или озвучку', to: 'video' },
+            { v: 'text', em: '¶', t: 'Текст, перевод или письмо', to: 'text' },
+            { v: '3d', em: '◈', t: '3D-модель или анимацию', to: '3d' },
+            { v: 'search', em: '⌕', t: 'Найти и разобрать информацию', to: 'assistant' },
+        ],
+    },
+    {
+        q: 'Что важнее?',
+        hint: 'От этого зависит, какие ограничения считать допустимыми.',
+        key: 'need',
+        options: [
+            { v: 'free', em: '0 ₽', t: 'Только бесплатные', flag: 'free' },
+            { v: 'novpn', em: '⇅', t: 'Чтобы работало без VPN', flag: 'novpn' },
+            { v: 'fast', em: '⚡', t: 'Чтобы отвечало быстро', flag: 'fast' },
+            { v: 'any', em: '◇', t: 'Не важно, подойдёт лучшее', flag: 'any' },
+        ],
+    },
+];
+
+const quizRoot = document.getElementById('quiz');
+let quizStep = 0;
+const quizAnswers = {};
+
+function openQuiz() {
+    quizRoot.classList.add('is-open');
+    quizRoot.setAttribute('aria-hidden', 'false');
+    drawQuiz();
+}
+
+function closeQuiz() {
+    quizRoot.classList.remove('is-open');
+    quizRoot.setAttribute('aria-hidden', 'true');
+}
+
+function drawQuiz() {
+    const step = QUIZ[quizStep];
+    document.getElementById('quizStep').textContent = `шаг ${quizStep + 1} из ${QUIZ.length}`;
+    document.getElementById('quizTitle').textContent = step.q;
+    document.getElementById('quizHint').textContent = step.hint;
+    document.getElementById('quizNote').textContent = quizStep ? 'Назад меняет первый выбор' : '';
+    document.getElementById('quizBody').innerHTML = step.options.map(o => `
+        <button class="quiz-q" data-v="${o.v}">
+            <span class="em" aria-hidden="true">${o.em}</span>
+            <span>${o.t}</span>
+        </button>`).join('');
+}
+
+function quizScore(tool, task, need) {
+    let s = 0;
+    const why = [];
+    if (tool.category === task) { s += 10; why.push('прямо под эту задачу'); }
+    if (need === 'free' && tool.payment === 'free') { s += 6; why.push('полностью бесплатно'); }
+    if (need === 'novpn' && tool.vpn === 'Без VPN') { s += 6; why.push('доступен без VPN'); }
+    if (need === 'fast' && /Очень|Быстро/.test(tool.speed)) { s += 5; why.push('быстрый отклик'); }
+    if (tool.vpn === 'Без VPN') s += 2;
+    if (tool.noSignup) s += 2;
+    s += (tool.userAvg ?? tool.rating) / 2;
+    return { s, why };
+}
+
+async function showQuizResult() {
+    const task = quizAnswers.task;
+    const need = quizAnswers.need || 'any';
+    const want = QUIZ[0].options.find(o => o.v === task).to;
+
+    // фильтруем по главному условию, но оставляем запасной вариант
+    let pool = tools.filter(t => t.category === want);
+    if (!pool.length) pool = tools.slice();
+    if (need === 'free') {
+        const free = pool.filter(t => t.payment === 'free');
+        if (free.length) pool = free;
+    }
+    if (need === 'novpn') {
+        const open = pool.filter(t => t.vpn === 'Без VPN');
+        if (open.length) pool = open;
+    }
+
+    const top = pool.map(t => ({ t, ...quizScore(t, want, need) }))
+        .sort((a, b) => b.s - a.s)
+        .slice(0, 3);
+
+    document.getElementById('quizStep').textContent = 'результат';
+    document.getElementById('quizTitle').textContent = 'Вот что подойдёт';
+    document.getElementById('quizHint').textContent = 'Подбор по категории, цене и доступности из каталога.';
+    document.getElementById('quizNote').textContent = '';
+    document.getElementById('quizBody').innerHTML = `
+        <div class="quiz-res">
+            ${top.map(({ t, why }) => `
+                <a class="quiz-pick" href="tool.html?id=${t.id}">
+                    <span class="em" aria-hidden="true">${(categoryLabels[t.category] || 'AI')[0]}</span>
+                    <span class="txt">
+                        <b>${t.name}</b>
+                        <span class="quiz-why">${why.length ? why.join(' · ') : t.desc}</span>
+                    </span>
+                    <span class="m-label">★ ${(t.userAvg ?? t.rating).toFixed(1)}</span>
+                </a>`).join('')}
+        </div>
+        <div class="quiz-foot">
+            <button class="btn quiet" id="quizAgain" style="height:34px;padding:0 14px;font-size:14px">Пройти заново</button>
+            <a class="btn" href="#catalog" data-quiz-close style="height:34px;padding:0 14px;font-size:14px">Весь каталог</a>
+        </div>`;
+}
+
+document.getElementById('quizBtn').addEventListener('click', () => {
+    quizStep = 0;
+    quizAnswers.task = null;
+    quizAnswers.need = null;
+    openQuiz();
+});
+
+quizRoot.addEventListener('click', e => {
+    if (e.target.closest('[data-quiz-close]')) { closeQuiz(); return; }
+
+    const opt = e.target.closest('.quiz-q');
+    if (opt) {
+        const step = QUIZ[quizStep];
+        quizAnswers[step.key] = opt.dataset.v;
+        if (quizStep < QUIZ.length - 1) { quizStep++; drawQuiz(); }
+        else showQuizResult();
+        return;
+    }
+
+    if (e.target.closest('#quizAgain')) {
+        quizStep = 0;
+        quizAnswers.task = null;
+        quizAnswers.need = null;
+        drawQuiz();
+    }
+});
+
+addEventListener('keydown', e => {
+    if (e.key === 'Escape' && quizRoot.classList.contains('is-open')) closeQuiz();
+});
+
+/* ---------- стек-билдер ---------- */
 let builderCat = 'code';
 document.getElementById('builderCats').addEventListener('click', e => {
-    const btn = e.target.closest('.filter-btn');
+    const btn = e.target.closest('button');
     if (!btn) return;
-    document.querySelectorAll('#builderCats .filter-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
+    document.querySelectorAll('#builderCats button').forEach(b => b.setAttribute('aria-pressed', 'false'));
+    btn.setAttribute('aria-pressed', 'true');
     builderCat = btn.dataset.cat;
 });
 
+const taskNames = {
+    code: 'разработка кода',
+    art: 'дизайн и 3D',
+    text: 'работа с текстом',
+    video: 'видео и аудио',
+};
+
 document.getElementById('buildBtn').addEventListener('click', async () => {
-    const res = await fetch('/api/tools');
-    const { tools: all } = await res.json();
+    const res = await api('/api/tools');
     const free = document.getElementById('fFree').checked;
     const noSignup = document.getElementById('fNoSignup').checked;
-    const matched = all.filter(t => (builderCat === 'art' ? ['art', '3d'] : [builderCat]).includes(t.category) && (!free || t.free) && (!noSignup || t.noSignup))
-        .sort((a, b) => b.rating - a.rating).slice(0, 3);
+    const cats = builderCat === 'art' ? ['art', '3d'] : [builderCat];
+
+    const matched = res.tools
+        .filter(t => cats.includes(t.category) && (!free || t.free) && (!noSignup || t.noSignup))
+        .sort((a, b) => b.rating - a.rating)
+        .slice(0, 3);
+
     const box = document.getElementById('buildResult');
     if (!matched.length) {
-        box.innerHTML = '<p style="color:var(--muted)">Под такие фильтры ничего не подошло. Ослабьте фильтры.</p>';
+        box.innerHTML = '<p class="empty">Под такие ограничения ничего не подошло. Снимите галочки и попробуйте снова.</p>';
         return;
     }
-    const prompt = `Я работаю над задачей: ${builderCat === 'code' ? 'разработка кода' : builderCat === 'art' ? 'дизайн и 3D' : builderCat === 'text' ? 'работа с текстом' : 'видео/аудио'}. Использую связку инструментов: ${matched.map(t => t.name).join(', ')}. Помоги составить первый рабочий шаг.`;
-    box.innerHTML = matched.map((t, i) => `
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--border)">
-            <div><b>${i + 1}. <a href="tool.html?id=${t.id}" style="color:var(--text)">${t.name}</a></b> <small style="color:var(--muted)">★ ${t.rating} ${t.free ? '· бесплатно' : ''} ${t.noSignup ? '· без регистрации' : ''}</small></div>
+
+    const prompt = `Задача: ${taskNames[builderCat]}.\nИнструменты: ${matched.map(t => t.name).join(', ')}.\nНачни с ${matched[0].name}: предложи 3 шага и сразу приступай к первому.`;
+
+    box.innerHTML = `
+        <p class="m-label">подборка</p>
+        ${matched.map(t => `
+            <div class="pick">
+                <span class="pill">${paymentLabels[t.payment]}</span>
+                <span><b>${t.name}</b> <span class="host">${t.domain}</span></span>
+                <a class="btn" style="height:34px;padding:0 15px;font-size:14px" href="tool.html?id=${t.id}">Открыть</a>
+            </div>`).join('')}
+        <p class="prompt" id="promptText"></p>
+        <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap">
+            <button class="btn" id="copyPrompt">Скопировать промпт</button>
+            <button class="btn primary" id="saveStack">Сохранить в Мой стек</button>
         </div>
-    `).join('') + `
-        <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap">
-            <button class="btn-ghost" id="copyPrompt">📋 Копировать стартовый промпт</button>
-            <button class="btn-primary-sm" id="saveStack">💾 Сохранить в Мой стек</button>
-        </div>
-        <p id="stackMsg" style="color:var(--muted);font-size:.85rem;min-height:1.2em"></p>`;
+        <p class="m-label" id="stackMsg" style="margin-top:10px"></p>`;
+
+    document.getElementById('promptText').textContent = prompt;
+
     document.getElementById('copyPrompt').addEventListener('click', async e => {
         await navigator.clipboard.writeText(prompt);
-        e.target.textContent = '✓ Скопировано';
+        showToast('Промпт скопирован');
+        e.target.textContent = 'Скопировано';
     });
-    document.getElementById('saveStack').addEventListener('click', async e => {
-        const res = await fetch('/api/stack', {
-            method: 'POST', credentials: 'same-origin',
-            headers: { 'Content-Type': 'application/json' },
+
+    document.getElementById('saveStack').addEventListener('click', async () => {
+        const r = await api('/api/stack', {
+            method: 'POST',
             body: JSON.stringify({ toolIds: matched.map(t => t.id) }),
         });
-        const data = await res.json();
-        document.getElementById('stackMsg').textContent = res.ok ? `Сохранено в Мой стек (${data.count} инструмента) ✓` : (data.error || 'Ошибка — войдите в аккаунт');
-        if (res.ok) showToast('Стек сохранён 💾');
+        document.getElementById('stackMsg').textContent = `Сохранено в Мой стек: ${r.count}`;
+        showToast('Стек сохранён');
     });
 });
 
-// Live AI Radar
-const radarLabels = { operational: 'Работает', degraded: 'Замедлен', down: 'Недоступен' };
-const radarColors = { operational: '#34d399', degraded: '#fbbf24', down: '#f87171' };
+/* ---------- live radar ---------- */
+const statusNote = {
+    operational: 'API отвечает в норме. Замер — обычный запрос к серверу провайдера.',
+    degraded: 'Отвечает, но заметно медленнее обычного. Бывает в часы пик.',
+    down: 'Запрос не прошёл: сервер не ответил или вернул ошибку 5xx.',
+    unknown: 'Замер ещё не выполнен, данных пока нет.',
+};
+// timeout ≠ сервис упал: это почти всегда режет маршрут провайдера
+const statusReason = s => s.error === 'timeout'
+    ? 'Сервер не успел ответить за 8 секунд. Чаще всего это не поломка сервиса, а блокировка маршрута вашим провайдером.'
+    : s.error === 'unreachable'
+        ? 'Соединение не установилось — DNS или сеть до этого адреса не пускает.'
+        : '';
+const statusLabel = s => s === 'operational' ? 'Работает'
+    : s === 'degraded' ? 'Замедлен'
+        : s === 'down' ? 'Недоступен' : 'Нет данных';
+
 async function loadRadar() {
+    const box = document.getElementById('radarBox');
     try {
-        const res = await fetch('/api/radar');
-        const { services } = await res.json();
-        document.getElementById('radarBox').innerHTML = services.map(s => `
-            <div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)">
-                <span style="width:10px;height:10px;border-radius:50%;background:${radarColors[s.status]};box-shadow:0 0 10px ${radarColors[s.status]};animation:pulse 1.6s infinite"></span>
-                <b style="flex:1">${s.name}</b>
-                <span style="color:${radarColors[s.status]}">${radarLabels[s.status]}</span>
-                <span style="color:var(--muted);min-width:70px;text-align:right">${s.latency !== null ? s.latency + ' мс' : '—'}</span>
-            </div>
-        `).join('');
-    } catch {}
+        const { services, summary, method } = await api('/api/radar');
+        const openIdx = [...box.querySelectorAll('.svc')].findIndex(r => r.classList.contains('open'));
+
+        const overall = summary.down ? 'bad' : summary.degraded ? 'warn' : '';
+        const headline = summary.total
+            ? (summary.down
+                ? `${summary.down} из ${summary.total} сервисов сейчас не отвечают`
+                : summary.degraded
+                    ? `все ${summary.total} отвечают, но ${summary.degraded} медленнее обычного`
+                    : `все ${summary.total} сервисов отвечают в норме`)
+            : 'идёт первый замер';
+
+        box.innerHTML = `
+            <header>
+                <span class="m-label">статус API-провайдеров</span>
+                <span class="m-label right">${method || ''}</span>
+            </header>
+            <p class="radar-head">
+                <span class="dot ${overall}"></span>
+                <b>${headline}</b>
+            </p>` +
+            services.map(s => `
+                <div class="svc" tabindex="0" role="button" aria-expanded="false">
+                    <span class="dot ${s.status === 'degraded' ? 'warn' : s.status === 'down' ? 'bad' : ''}"></span>
+                    <b>${s.name}</b>
+                    <span class="st">${statusLabel(s.status)}</span>
+                    <span class="up">${s.uptime24h !== null ? 'аптайм ' + s.uptime24h + '%' : '—'}</span>
+                    <span class="lat">${s.latency !== null ? s.latency + ' мс' : '—'}</span>
+                </div>
+                <div class="svc-detail"><div>
+                    <p>${statusNote[s.status]}</p>
+                    ${s.error ? `<p style="padding-top:0">${statusReason(s)}</p>` : ''}
+                    <p class="m-label" style="padding-top:0">Проверено ${s.checkedAt ? new Date(s.checkedAt).toLocaleString('ru-RU') : '—'} · замеров за сутки: ${s.checks || 0}</p>
+                </div></div>
+            `).join('');
+
+        if (openIdx > -1) {
+            const row = box.querySelectorAll('.svc')[openIdx];
+            row.classList.add('open');
+            row.setAttribute('aria-expanded', 'true');
+            row.nextElementSibling.classList.add('open');
+        }
+
+        box.querySelectorAll('.svc').forEach(row => {
+            const toggle = () => {
+                const open = row.classList.toggle('open');
+                row.setAttribute('aria-expanded', String(open));
+                row.nextElementSibling.classList.toggle('open');
+            };
+            row.addEventListener('click', toggle);
+            row.addEventListener('keydown', e => {
+                if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); }
+            });
+        });
+    } catch {
+        box.innerHTML = '<header><span class="m-label">статус API-провайдеров</span></header>'
+            + '<p class="radar-head"><b>Не удалось загрузить статус. Обновите страницу.</b></p>';
+    }
 }
 loadRadar();
 setInterval(loadRadar, 10000);
 
-// Reveal on scroll
-const observer = new IntersectionObserver(entries => {
-    entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); observer.unobserve(e.target); } });
-}, { threshold: 0.1 });
-function observeReveals() {
-    document.querySelectorAll('.card:not(.visible), .section-title').forEach(el => {
-        el.classList.add('reveal');
-        observer.observe(el);
-    });
-}
-const oldRender = render;
-render = function () { oldRender(); observeReveals(); };
-observeReveals();
-
-// Back to top
+/* ---------- наверх ---------- */
 const toTop = document.getElementById('toTop');
-addEventListener('scroll', () => toTop.classList.toggle('show', scrollY > 500));
+addEventListener('scroll', () => toTop.classList.toggle('show', scrollY > 700), { passive: true });
 toTop.addEventListener('click', () => scrollTo({ top: 0, behavior: 'smooth' }));
+
+/* ---------- deep-links: состояние фильтров в URL ---------- */
+function syncUrl() {
+    const p = new URLSearchParams();
+    if (activeFilter !== 'all') p.set('cat', activeFilter);
+    const pay = document.getElementById('paymentSel').value;
+    const vpn = document.getElementById('vpnSel').value;
+    const sort = document.getElementById('sortSel').value;
+    if (pay !== 'all') p.set('pay', pay);
+    if (vpn !== 'all') p.set('vpn', vpn);
+    if (sort !== 'rating') p.set('sort', sort);
+    const qs = p.toString();
+    history.replaceState(null, '', location.pathname + (qs ? '?' + qs : '') + location.hash);
+}
+
+function readUrl() {
+    const p = new URLSearchParams(location.search);
+    const cat = p.get('cat');
+    if (cat && [...filtersWrap.querySelectorAll('button')].some(b => b.dataset.filter === cat)) {
+        activeFilter = cat;
+        filtersWrap.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.filter === cat)));
+    }
+    const pay = p.get('pay');
+    if (pay) document.getElementById('paymentSel').value = pay;
+    const vpn = p.get('vpn');
+    if (vpn) document.getElementById('vpnSel').value = vpn;
+    const sort = p.get('sort');
+    if (sort) document.getElementById('sortSel').value = sort;
+}
+
+/* ---------- инструмент дня ---------- */
+async function loadDaily() {
+    const box = document.getElementById('dailyBox');
+    if (!box) return;
+    try {
+        const { tool, prompt } = await api('/api/daily');
+        const since = new Date(Date.now() / 86400000 * 86400000);
+        box.innerHTML = `
+            <div>
+                <p class="day-num">${since.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })}</p>
+                <h3><a href="tool.html?id=${tool.id}">${tool.name}</a></h3>
+                <p>${tool.desc}</p>
+                <p class="prompt">${prompt}</p>
+            </div>
+            <div style="display:grid;gap:10px">
+                <a class="btn" href="tool.html?id=${tool.id}">Открыть</a>
+                <button class="btn primary" id="dailyFav">В избранное</button>
+            </div>`;
+        document.getElementById('dailyFav').addEventListener('click', async () => {
+            await api(`/api/tools/${tool.id}/favorite`, { method: 'POST' });
+            showToast('Добавлено в избранное');
+        });
+    } catch { }
+}
+
+/* ---------- подборки сообщества ---------- */
+async function loadCommunity() {
+    const box = document.getElementById('communityBox');
+    if (!box) return;
+    try {
+        const { stacks } = await api('/api/community-stacks');
+        box.innerHTML = stacks.map(s => `
+            <article class="stack-card">
+                <span class="m-label">${s.task}</span>
+                <h3>${s.name}</h3>
+                <div class="tools">${s.tools.map(t => `<span>${t.name}</span>`).join('')}</div>
+                <div class="foot">
+                    <span class="author">${s.author} · ${s.likes} ♥</span>
+                    <span style="flex:1"></span>
+                    <button class="btn" data-apply="${s.id}" style="height:34px;padding:0 14px;font-size:14px">Применить</button>
+                </div>
+            </article>`).join('');
+
+        box.addEventListener('click', async e => {
+            const btn = e.target.closest('[data-apply]');
+            if (!btn) return;
+            const stack = stacks.find(s => s.id === Number(btn.dataset.apply));
+            await api('/api/stack', { method: 'POST', body: JSON.stringify({ toolIds: stack.tools.map(t => t.id) }) });
+            showToast(`Стек «${stack.name}» в вашем Моём стеке`);
+        });
+    } catch { }
+}
+
+loadDaily();
+loadCommunity();
+
+/* ---------- старт ---------- */
+renderAuth(null);
+readUrl();
+(async function init() {
+    try {
+        const data = await api('/api/tools');
+        tools = data.tools;
+        render();
+    } catch {
+        grid.innerHTML = '<p class="empty">Каталог временно недоступен. Обновите страницу.</p>';
+    }
+    try {
+        const { user } = await api('/api/me');
+        renderAuth(user);
+    } catch { /* гость */ }
+})();

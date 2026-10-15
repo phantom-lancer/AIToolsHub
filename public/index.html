@@ -1,124 +1,224 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="ru" data-theme="light" data-mode="auto">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Tools Hub — Каталог нейросетей</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Unbounded:wght@500;700&display=swap" rel="stylesheet">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#eef0f4">
+    <title>AI Tools Hub — каталог нейросетей</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="bg-orbs">
-        <div class="orb orb-1"></div>
-        <div class="orb orb-2"></div>
-        <div class="orb orb-3"></div>
-    </div>
-
-    <header class="header">
-        <nav class="nav container">
-            <a href="#top" class="logo">AI<span>Tools</span>Hub</a>
-            <div class="auth-area">
-                <select class="theme-select" id="themeSelect" title="Тема">
-                    <option value="auto">Авто</option>
-                    <option value="dark">Тёмная</option>
-                    <option value="light">Светлая</option>
-                </select>
-                <div class="auth-area" id="authArea" style="padding:0">
-                    <button class="btn-ghost" id="loginBtn">Войти</button>
-                    <button class="btn-primary-sm" id="registerBtn">Регистрация</button>
-                </div>
-            </div>
+    <header class="topbar glass">
+        <a class="brand" href="#top"><span class="dotmark">AI</span>AI Tools Hub</a>
+        <nav class="mainnav">
+            <a href="#catalog">Каталог</a>
+            <a href="#radar">Статус</a>
+            <a href="#builder">Стек-билдер</a>
+            <a href="compare.html">Сравнение</a>
         </nav>
+        <span class="sp"></span>
+        <button class="btn quiet" data-open-cmd title="Командная палитра — ⌘K">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/></svg>
+            <span class="cmd-hint">⌘K</span>
+        </button>
+        <button class="theme-toggle" aria-label="Сменить тему">
+            <svg class="i-auto" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.6"/><path d="M12 3.4a8.6 8.6 0 0 1 0 17.2Z" fill="currentColor" stroke="none"/></svg>
+            <svg class="i-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.6v2.2M12 19.2v2.2M2.6 12h2.2M19.2 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6"/></svg>
+            <svg class="i-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 13.2A8.6 8.6 0 0 1 10.8 3a8.6 8.6 0 1 0 10.2 10.2Z"/></svg>
+        </button>
+        <span id="authArea" style="display:flex;gap:8px;align-items:center">
+            <button class="btn quiet" id="loginBtn">Войти</button>
+            <button class="btn primary" id="registerBtn">Регистрация</button>
+        </span>
     </header>
 
     <main id="top">
-        <section class="hero container">
-            <p class="hero-tag">Нейросети 2026</p>
-            <h1>Откройте мир <span class="gradient-text">AI-инструментов</span></h1>
-            <p class="hero-sub">Каталог лучших нейросетей для текста, кода, арта и видео.</p>
-            <div style="margin-top:20px;display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
-                <a href="compare.html" class="btn-primary-sm" style="text-decoration:none">⚖️ Сравнить нейросети</a>
-                <button class="btn-ghost" id="luckyBtn">🎲 Мне повезёт</button>
+        <section class="wrap hero">
+            <span class="badge glass"><span class="pulse"></span>24 нейросети · статус обновляется каждые 10 секунд</span>
+            <h1>Инструменты ИИ, с которыми реально работают</h1>
+            <p class="lead">Хочешь нейросеть под задачу — но не знаешь, какую. Мы собираем 24 сервиса в одном списке и показываем честное: что бесплатно, где нужен VPN, сколько стоит и работает ли он сейчас.</p>
+            <div class="actions">
+                <button class="btn primary" id="quizBtn">Подобрать под задачу</button>
+                <button class="btn" id="luckyBtn">Случайный инструмент</button>
+                <a class="btn" href="#builder">Собрать стек</a>
+                <a class="btn" href="compare.html">Сравнить два</a>
+            </div>
+            <p class="note">Без рекламы и партнёрских ссылок. Данные проверяются автоматически, оценки ставят посетители.</p>
+
+            <div class="panel glass how" id="how">
+                <div class="how-step">
+                    <span class="how-n">1</span>
+                    <b>Скажи, что делаешь</b>
+                    <span>Код, картинки, текст, видео, 3D — одна кнопка.</span>
+                </div>
+                <div class="how-step">
+                    <span class="how-n">2</span>
+                    <b>Получишь 3 варианта</b>
+                    <span>С лимитами, ценой и пометкой про VPN.</span>
+                </div>
+                <div class="how-step">
+                    <span class="how-n">3</span>
+                    <b>Сохранишь стек</b>
+                    <span>В профиле, с оценками и комментариями других.</span>
+                </div>
+            </div>
+
+            <div id="radar">
+                <div class="panel glass status-panel" id="radarBox" style="margin-top:44px">
+                    <header>
+                        <span class="m-label">статус API-провайдеров</span>
+                    </header>
+                    <p class="radar-head"><b>Загружаем реальные замеры…</b></p>
+                </div>
             </div>
         </section>
 
-        <section id="catalog" class="container section">
-            <h2 class="section-title">Каталог инструментов</h2>
-            <div class="controls">
-                <input type="text" id="searchInput" placeholder="Поиск по названию, описанию или тегам...">
-                <div class="filters" id="filters">
-                    <button class="filter-btn active" data-filter="all">Все</button>
-                    <button class="filter-btn" data-filter="text">Текст</button>
-                    <button class="filter-btn" data-filter="code">Кодинг</button>
-                    <button class="filter-btn" data-filter="art">Графика</button>
-                    <button class="filter-btn" data-filter="video">Аудио/Видео</button>
-                    <button class="filter-btn" data-filter="3d">3D</button>
-                    <button class="filter-btn" data-filter="assistant">Ассистенты</button>
-                </div>
+        <section class="wrap section" id="catalog">
+            <div class="sec-head">
+                <p class="m-label">каталог</p>
+                <h2>Найдите свой инструмент</h2>
+                <p>Поиск по названию, описанию и тегам. Фильтры по категории, оплате и доступности.</p>
             </div>
-            <div class="controls" style="margin-bottom:20px">
-                <select id="paymentSel" class="theme-select">
+
+            <div class="controls">
+                <input class="search" type="text" id="searchInput" placeholder="Например: генерация картинок, код, музыка…">
+                <select class="select" id="paymentSel" data-grow="1" aria-label="Модель оплаты">
                     <option value="all">Любая оплата</option>
                     <option value="free">Бесплатно</option>
-                    <option value="freemium">Freemium</option>
+                    <option value="freemium">Бесплатно с лимитами</option>
                     <option value="paid">Платно</option>
                 </select>
-                <select id="vpnSel" class="theme-select">
+                <select class="select" id="vpnSel" data-grow="1" aria-label="Доступность">
                     <option value="all">Любой доступ</option>
                     <option value="Без VPN">Без VPN</option>
                     <option value="Нужен VPN">Нужен VPN</option>
                 </select>
-                <select id="sortSel" class="theme-select">
+                <select class="select" id="sortSel" data-grow="1" aria-label="Сортировка">
                     <option value="rating">По рейтингу</option>
                     <option value="reviews">По отзывам</option>
                 </select>
             </div>
-            <div class="grid" id="grid"></div>
-            <p class="empty" id="emptyMsg" hidden>Ничего не найдено.</p>
-        </section>
 
-        <section id="builder" class="container section">
-            <h2 class="section-title">Smart AI Stack Builder</h2>
-            <div class="card glass" style="padding:30px">
-                <p style="color:var(--muted);margin-bottom:16px">Выберите задачу и фильтры — подберём идеальный стек из 3 нейросетей.</p>
-                <div class="filters" id="builderCats">
-                    <button class="filter-btn active" data-cat="code">Кодинг</button>
-                    <button class="filter-btn" data-cat="art">3D / Дизайн</button>
-                    <button class="filter-btn" data-cat="text">Работа с текстом</button>
-                    <button class="filter-btn" data-cat="video">Аудио / Видео</button>
-                </div>
-                <div style="margin:16px 0;display:flex;gap:20px;flex-wrap:wrap">
-                    <label><input type="checkbox" id="fFree"> Бесплатно</label>
-                    <label><input type="checkbox" id="fNoSignup"> Без регистрации</label>
-                </div>
-                <button class="btn-primary-sm" id="buildBtn">Подобрать стек</button>
-                <div id="buildResult" style="margin-top:24px"></div>
+            <div class="tabs" id="filters" role="group" aria-label="Категории">
+                <button aria-pressed="true" data-filter="all">Все</button>
+                <button aria-pressed="false" data-filter="text">Текст</button>
+                <button aria-pressed="false" data-filter="code">Кодинг</button>
+                <button aria-pressed="false" data-filter="art">Графика</button>
+                <button aria-pressed="false" data-filter="video">Аудио и видео</button>
+                <button aria-pressed="false" data-filter="3d">3D</button>
+                <button aria-pressed="false" data-filter="assistant">Ассистенты</button>
             </div>
+
+            <div class="panel glass" style="margin-top:16px">
+                <div class="list-head">
+                    <span></span>
+                    <span class="m-label">инструмент</span>
+                    <span class="m-label">для чего</span>
+                    <span class="m-label">оплата</span>
+                    <span class="m-label">доступ</span>
+                    <span class="m-label" style="text-align:right">рейтинг</span>
+                    <span></span>
+                </div>
+                <div class="list" id="grid"></div>
+            </div>
+            <p class="empty" id="emptyMsg" hidden>Ничего не нашлось. Попробуйте другой запрос.</p>
         </section>
 
-        <section id="radar" class="container section">
-            <h2 class="section-title">Live AI Radar</h2>
-            <div class="card glass" style="padding:30px">
-                <div id="radarBox"></div>
-                <p style="color:var(--muted);font-size:.8rem;margin-top:12px">Обновляется каждые 10 секунд</p>
+        <section class="wrap section" id="daily">
+            <div class="sec-head">
+                <p class="m-label">инструмент дня</p>
+                <h2>Попробуйте сегодня</h2>
+                <p>Один инструмент и готовая подсказка — каждый день новый.</p>
+            </div>
+            <div class="panel glass daily" id="dailyBox"></div>
+        </section>
+
+        <section class="wrap section" id="community">
+            <div class="sec-head">
+                <p class="m-label">подборки сообщества</p>
+                <h2>Стеки, которые уже собирали</h2>
+                <p>Готовые наборы под задачу. Нажмите «Применить» — инструменты попадут в ваш Мой стек.</p>
+            </div>
+            <div class="community" id="communityBox"></div>
+        </section>
+
+        <section class="wrap section" id="builder">
+            <div class="sec-head">
+                <p class="m-label">smart stack builder</p>
+                <h2>Стек под задачу</h2>
+                <p>Отметьте ограничения — подберём три инструмента, стартовый промпт и сохраним набор в профиль.</p>
+            </div>
+            <div class="builder">
+                <div>
+                    <div class="tabs" id="builderCats" role="group" aria-label="Задача">
+                        <button aria-pressed="true" data-cat="code">Кодинг</button>
+                        <button aria-pressed="false" data-cat="art">3D и дизайн</button>
+                        <button aria-pressed="false" data-cat="text">Текст</button>
+                        <button aria-pressed="false" data-cat="video">Аудио и видео</button>
+                    </div>
+                    <div class="opts">
+                        <label class="opt"><input type="checkbox" id="fFree"><span>Только бесплатные</span></label>
+                        <label class="opt"><input type="checkbox" id="fNoSignup"><span>Без регистрации</span></label>
+                    </div>
+                    <button class="btn primary" id="buildBtn" style="margin-top:16px">Подобрать стек</button>
+                </div>
+                <div class="panel glass" id="buildResult" style="padding:20px"></div>
             </div>
         </section>
     </main>
 
-    <button id="toTop" aria-label="Наверх">↑</button>
-
-    <footer class="footer">
-        <p>© 2026 AI Tools Hub</p>
+    <footer class="wrap footer">
+        <span class="m-label">© 2026 AI Tools Hub</span>
+        <div style="display:flex;gap:16px;flex-wrap:wrap">
+            <a class="m-label" href="changelog.html">Что нового</a>
+            <span class="m-label">Node.js · SQLite · Vanilla JS</span>
+        </div>
     </footer>
+
+    <div class="quiz" id="quiz" aria-hidden="true">
+        <div class="quiz-scrim" data-quiz-close></div>
+        <div class="quiz-card panel glass" role="dialog" aria-modal="true" aria-label="Подбор инструмента">
+            <p class="quiz-step" id="quizStep">шаг 1 из 2</p>
+            <h2 id="quizTitle">Что тебе нужно сделать?</h2>
+            <p style="color:var(--fg-2)" id="quizHint">Выбери задачу — покажу три подходящих инструмента.</p>
+            <div class="quiz-qs" id="quizBody"></div>
+            <div class="quiz-foot">
+                <span class="m-label" id="quizNote"></span>
+                <button class="btn quiet" data-quiz-close style="height:34px;padding:0 14px;font-size:14px">Закрыть</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="sheet-root" id="sheetRoot" aria-hidden="true">
+        <div class="sheet-scrim" data-sheet-close></div>
+        <div class="sheet glass" role="dialog" aria-modal="true" aria-label="Сравнение">
+            <div class="sheet-grip"></div>
+            <div class="sheet-head">
+                <b>Сравнение</b>
+                <span class="m-label" id="sheetCount">0 выбрано</span>
+                <span style="flex:1"></span>
+                <button class="btn quiet" data-sheet-close style="height:32px;padding:0 12px;font-size:14px">Закрыть</button>
+            </div>
+            <div class="sheet-items" id="sheetItems"></div>
+            <div class="sheet-actions">
+                <button class="btn primary" id="sheetCompare" disabled>Сравнить</button>
+            </div>
+        </div>
+    </div>
+
+    <button id="toTop" aria-label="Наверх">↑</button>
 
     <div class="modal" id="loginModal" hidden>
         <div class="modal-card glass">
-            <button class="modal-close" data-close>&times;</button>
+            <button class="modal-close" data-close aria-label="Закрыть">&times;</button>
             <h3>Вход</h3>
             <form id="loginForm">
-                <input type="text" name="username" placeholder="Логин" required>
-                <input type="password" name="password" placeholder="Пароль" required>
-                <button type="submit" class="btn-primary-sm">Войти</button>
+                <input type="text" name="username" placeholder="Логин" autocomplete="username" required>
+                <input type="password" name="password" placeholder="Пароль" autocomplete="current-password" required>
+                <button type="submit" class="btn primary">Войти</button>
                 <p class="form-error" id="loginError"></p>
             </form>
         </div>
@@ -126,13 +226,13 @@
 
     <div class="modal" id="registerModal" hidden>
         <div class="modal-card glass">
-            <button class="modal-close" data-close>&times;</button>
+            <button class="modal-close" data-close aria-label="Закрыть">&times;</button>
             <h3>Регистрация</h3>
             <form id="registerForm">
-                <input type="text" name="username" placeholder="Логин" required>
-                <input type="email" name="email" placeholder="Email" required>
-                <input type="password" name="password" placeholder="Пароль (мин. 6)" required>
-                <button type="submit" class="btn-primary-sm">Создать аккаунт</button>
+                <input type="text" name="username" placeholder="Логин" autocomplete="username" required>
+                <input type="email" name="email" placeholder="Email" autocomplete="email" required>
+                <input type="password" name="password" placeholder="Пароль, минимум 6 символов" autocomplete="new-password" required>
+                <button type="submit" class="btn primary">Создать аккаунт</button>
                 <p class="form-error" id="registerError"></p>
             </form>
         </div>
@@ -141,6 +241,11 @@
     <script src="toast.js"></script>
     <script src="theme.js"></script>
     <script src="bg.js"></script>
+    <script src="select.js"></script>
+    <script src="motion-loader.js"></script>
+    <script>window.__motion = null; loadMotion().then(m => window.__motion = m);</script>
+    <script src="transitions.js"></script>
+    <script src="palette.js"></script>
     <script src="script.js"></script>
 </body>
 </html>

@@ -1,135 +1,275 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="ru" data-theme="light" data-mode="auto">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#f2f2ef">
     <title>Инструмент — AI Tools Hub</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Unbounded:wght@500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="bg-orbs">
-        <div class="orb orb-1"></div>
-        <div class="orb orb-2"></div>
-        <div class="orb orb-3"></div>
-    </div>
-
-    <header class="header">
-        <nav class="nav container">
-            <a href="index.html" class="logo">AI<span>Tools</span>Hub</a>
-            <div style="display:flex;gap:10px;align-items:center">
-                <select class="theme-select" id="themeSelect" title="Тема">
-                    <option value="auto">Авто</option>
-                    <option value="dark">Тёмная</option>
-                    <option value="light">Светлая</option>
-                </select>
-                <a href="index.html#catalog" class="btn-ghost">← К каталогу</a>
-            </div>
-        </nav>
+    <header class="topbar glass">
+        <a class="brand" href="index.html"><span class="dotmark">AI</span>AI Tools Hub</a>
+        <span class="sp"></span>
+        <button class="btn quiet" data-open-cmd title="Командная палитра — ⌘K">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/></svg>
+            <span class="cmd-hint">⌘K</span>
+        </button>
+        <button class="theme-toggle" aria-label="Сменить тему">
+            <svg class="i-auto" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.6"/><path d="M12 3.4a8.6 8.6 0 0 1 0 17.2Z" fill="currentColor" stroke="none"/></svg>
+            <svg class="i-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.6v2.2M12 19.2v2.2M2.6 12h2.2M19.2 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6"/></svg>
+            <svg class="i-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 13.2A8.6 8.6 0 0 1 10.8 3a8.6 8.6 0 1 0 10.2 10.2Z"/></svg>
+        </button>
+        <a class="btn" href="index.html#catalog">К каталогу</a>
     </header>
 
-    <main class="container section">
+    <main class="wrap hero" style="padding-bottom:20px">
         <div id="toolPage"></div>
     </main>
 
-    <footer class="footer"><p>© 2026 AI Tools Hub</p></footer>
+    <footer class="wrap footer">
+        <span class="m-label">© 2026 AI Tools Hub</span>
+        <a class="m-label" href="index.html">Вернуться в каталог</a>
+    </footer>
+
+    <div id="toast" aria-live="polite"></div>
+
     <script src="toast.js"></script>
     <script src="theme.js"></script>
     <script src="bg.js"></script>
+    <script src="motion-loader.js"></script>
+    <script>window.__motion = null; loadMotion().then(m => window.__motion = m);</script>
+    <script src="transitions.js"></script>
+    <script src="palette.js"></script>
     <script>
-        const categoryNames = { text: 'Текст', code: 'Код', art: 'Арт', video: 'Видео' };
-        const categoryEmoji = { text: '✍️', code: '💻', art: '🎨', video: '🎬' };
+        const paymentLabels = { free: 'Бесплатно', freemium: 'Бесплатно с лимитами', paid: 'Платно' };
         const id = new URLSearchParams(location.search).get('id');
         let myRating = 0;
 
         function starsHtml(value) {
-            return [1,2,3,4,5].map(v => `<span data-v="${v}" class="${v <= value ? 'on' : ''}">★</span>`).join('');
+            return [1, 2, 3, 4, 5].map(v => `<span data-v="${v}" class="${v <= value ? 'on' : ''}">★</span>`).join('');
         }
-
         function renderStars() {
             document.getElementById('stars').innerHTML = starsHtml(myRating);
         }
 
         async function load() {
             const res = await fetch('/api/tools/' + id, { credentials: 'same-origin' });
+            const page = document.getElementById('toolPage');
             if (!res.ok) {
-                document.getElementById('toolPage').innerHTML = '<p class="empty">Инструмент не найден.</p>';
+                page.innerHTML = '<h1>Инструмент не найден</h1><p class="empty" style="margin-top:12px">Вернитесь в каталог и выберите другой сервис.</p>';
                 return;
             }
             const { tool, ratingsCount, userAvg, comments, myRating: mr, isFavorite } = await res.json();
             myRating = mr;
-            document.title = tool.name + ' — AI Tools Hub';
-            document.getElementById('toolPage').innerHTML = `
-                <div class="card glass" style="max-width:760px;margin:0 auto;padding:36px">
-                    <span class="card-badge badge-${tool.category}">${categoryNames[tool.category]}</span>
-                    <span class="card-badge" style="background:rgba(255,255,255,.08);color:var(--muted)">${({ free: 'Бесплатно', freemium: 'Freemium', paid: 'Платно' })[tool.payment]}</span>
-                    <span class="card-badge" style="background:${tool.vpn === 'Без VPN' ? 'rgba(52,211,153,.15);color:#34d399' : 'rgba(248,113,113,.15);color:#f87171'}">${tool.vpn}</span>
-                    <br><a href="${tool.url}" target="_blank" style="color:var(--accent2)">${tool.url}</a>
-                    <h1 style="font-family:'Unbounded';margin-bottom:16px">${tool.name}</h1>
-                    <img class="tool-logo" style="width:64px;height:64px" src="https://www.google.com/s2/favicons?domain=${tool.domain}&sz=128" alt="${tool.name}" onerror="this.outerHTML='&lt;div class=tool-logo logo-fallback style=width:64px;height:64px&gt;${tool.name[0]}&lt;/div&gt;'">
-                    <p style="color:var(--muted);margin-bottom:20px">${tool.desc}</p>
-                    <p class="card-rating" style="font-size:1.3rem">★ ${userAvg ?? tool.rating} / 5 <small style="color:var(--muted);font-size:.9rem">(${ratingsCount} оценок)</small></p>
-                    <button class="btn-ghost" id="favBtn" style="margin-left:12px">${isFavorite ? '♥ В избранном' : '♡ В избранное'}</button>
-                    <div style="margin:24px 0">
-                        <p style="margin-bottom:8px">Ваша оценка:</p>
-                        <div class="stars" id="stars"></div>
-                        <p id="rateMsg" style="color:var(--muted);font-size:.85rem;min-height:1.2em"></p>
-                    </div>
-                    <hr style="border-color:var(--border);margin:24px 0">
-                    <h3 style="margin-bottom:12px">Комментарии (${comments.length})</h3>
-                    <textarea class="commentInput" id="commentInput" placeholder="Поделитесь впечатлением..." maxlength="500"></textarea>
-                    <button class="btn-primary-sm" id="sendComment" style="margin-top:10px">Отправить</button>
-                    <p id="commentMsg" style="color:var(--muted);font-size:.85rem;min-height:1.2em"></p>
-                    <div id="commentsList">
-                        ${comments.map(c => `
-                            <div class="comment">
-                                ${c.avatar ? `<img src="${c.avatar}" class="avatar">` : `<div class="avatar-initial">${c.username[0].toUpperCase()}</div>`}
-                                <div>
-                                    <b>${c.username}</b> <small style="color:var(--muted)">${new Date(c.created_at).toLocaleString('ru-RU')}</small>
-                                    <p>${c.text.replace(/</g, '&lt;')}</p>
-                                </div>
-                            </div>
-                        `).join('') || '<p style="color:var(--muted)">Пока нет комментариев — будьте первым!</p>'}
-                    </div>
-                </div>
-            `;
-            renderStars();
+            document.title = `${tool.name} — AI Tools Hub`;
 
-            document.getElementById('favBtn').addEventListener('click', async () => {
-                const res = await fetch('/api/tools/' + id + '/favorite', { method: 'POST', credentials: 'same-origin' });
-                const data = await res.json();
-                if (res.ok) { document.getElementById('favBtn').textContent = data.favorite ? '♥ В избранном' : '♡ В избранное'; showToast(data.favorite ? 'Добавлено в избранное ♥' : 'Убрано из избранного'); }
-                else document.getElementById('favBtn').textContent = 'Войдите, чтобы добавить';
-            });
+            page.innerHTML = `
+                <div class="tool-head">
+                    <span class="mark-lg">
+                        <img style="width:30px;height:30px;object-fit:contain"
+                             src="https://www.google.com/s2/favicons?domain=${tool.domain}&sz=128" alt=""
+                             onerror="this.outerHTML='<span style=font-size:22px;font-weight:650>${tool.name[0]}</span>'">
+                    </span>
+                    <div>
+                        <h1>${tool.name}</h1>
+                        <p class="host" style="margin-top:6px"><a href="${tool.url}" target="_blank" rel="noopener">${tool.url}</a></p>
+                        <div class="meta-row">
+                            <span class="pill">${paymentLabels[tool.payment]}</span>
+                            <span class="pill ${tool.vpn === 'Без VPN' ? 'ok' : 'bad'}">${tool.vpn}</span>
+                            <span class="pill">${tool.speed}</span>
+                        </div>
+                    </div>
+                    <span class="sp" style="flex:1"></span>
+                    <button class="btn" id="favBtn">${isFavorite ? '★ В избранном' : '☆ В избранное'}</button>
+                </div>
+
+                <div class="panel glass" style="padding:26px;margin-top:22px">
+                    <p style="color:var(--fg-2);font-size:17px">${tool.desc}</p>
+
+                    <div class="kv">
+                        <span class="pill">лимиты: ${tool.limits}</span>
+                    </div>
+
+                    <div class="kv" style="display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:22px">
+                        <div>
+                            <p class="m-label" style="margin-bottom:6px">плюсы</p>
+                            <p>${tool.pros}</p>
+                        </div>
+                        <div>
+                            <p class="m-label" style="margin-bottom:6px">минусы</p>
+                            <p style="color:var(--fg-2)">${tool.cons}</p>
+                        </div>
+                    </div>
+
+                    <div style="margin-top:26px;padding-top:20px;border-top:.5px solid var(--line-2)">
+                        <div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap">
+                            <span style="font-family:var(--mono);font-size:26px">${(userAvg ?? tool.rating).toFixed(1)}</span>
+                            <span class="m-label">${userAvg
+                                ? `из 5 · средняя по ${ratingsCount} ${ratingsCount === 1 ? 'оценке' : 'оценкам'} посетителей`
+                                : 'из 5 · оценка редакции, посетители ещё не голосовали'}</span>
+                        </div>
+                        <p class="m-label" style="margin:16px 0 6px">ваша оценка</p>
+                        <div class="stars" id="stars" role="group" aria-label="Поставить оценку"></div>
+                        <p class="m-label" id="rateMsg" style="margin-top:8px;min-height:1.3em"></p>
+                    </div>
+
+                    <div style="margin-top:26px;padding-top:20px;border-top:.5px solid var(--line-2)">
+                        <p class="m-label" style="margin-bottom:10px">комментарии · ${comments.length}</p>
+                        <textarea class="commentInput" id="commentInput" maxlength="500"
+                                  placeholder="Поделитесь впечатлением от работы с сервисом…"></textarea>
+                        <button class="btn primary" id="sendComment" style="margin-top:10px">Отправить</button>
+                        <p class="m-label" id="commentMsg" style="margin-top:8px;min-height:1.3em"></p>
+
+                        <div class="sort-row">
+                            <button class="btn" data-sort="new" style="height:32px;padding:0 13px;font-size:13.5px">Новые</button>
+                            <button class="btn" data-sort="top" style="height:32px;padding:0 13px;font-size:13.5px">Популярные</button>
+                        </div>
+                        <div id="commentsList" style="margin-top:10px"></div>
+                    </div>
+                </div>`;
+
+            renderStars();
 
             document.getElementById('stars').addEventListener('click', async e => {
                 const s = e.target.closest('span');
                 if (!s) return;
                 const value = Number(s.dataset.v);
-                const res = await fetch('/api/tools/' + id + '/rate', {
+                const r = await fetch(`/api/tools/${id}/rate`, {
                     method: 'POST', credentials: 'same-origin',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ value }),
                 });
-                const data = await res.json();
+                const data = await r.json();
                 const msg = document.getElementById('rateMsg');
-                if (res.ok) { myRating = value; renderStars(); msg.textContent = 'Оценка сохранена ✓'; showToast('Оценка сохранена ★ ' + value); }
-                else msg.textContent = data.error || 'Ошибка';
+                if (r.ok) {
+                    myRating = value; renderStars();
+                    msg.textContent = 'Оценка сохранена';
+                    showToast(`Оценка ${value} из 5 сохранена`);
+                } else {
+                    msg.textContent = data.error || 'Не удалось сохранить оценку';
+                }
+            });
+
+            document.getElementById('favBtn').addEventListener('click', async () => {
+                const r = await fetch(`/api/tools/${id}/favorite`, { method: 'POST', credentials: 'same-origin' });
+                const data = await r.json();
+                if (!r.ok) { showToast('Войдите, чтобы добавить в избранное'); return; }
+                document.getElementById('favBtn').textContent = data.favorite ? '★ В избранном' : '☆ В избранное';
+                showToast(data.favorite ? 'Добавлено в избранное' : 'Убрано из избранного');
+            });
+
+            /* ---------- комментарии: лайки, ответы, сортировка ---------- */
+            let sortBy = 'new';
+
+            function renderComments() {
+                const sorted = [...comments].sort((a, b) =>
+                    sortBy === 'top' ? (b.likes - a.likes) : (b.id - a.id)
+                );
+                const box = document.getElementById('commentsList');
+                box.innerHTML = sorted.length ? sorted.map(c => `
+                    <div class="comment" data-cid="${c.id}">
+                        ${c.avatar
+                            ? `<img class="avatar" src="${c.avatar}" alt="">`
+                            : `<span class="avatar-initial">${c.username[0].toUpperCase()}</span>`}
+                        <div style="min-width:0">
+                            <b>${c.username}</b>
+                            <span class="host">${new Date(c.created_at).toLocaleString('ru-RU')}</span>
+                            <p style="margin-top:4px">${c.text.replace(/</g, '&lt;')}</p>
+                            <div class="cmt-actions">
+                                <button class="cmt-btn${c.liked ? ' liked' : ''}" data-like="${c.id}">♥ ${c.likes || ''}</button>
+                                <button class="cmt-btn" data-reply-open="${c.id}">Ответить</button>
+                                ${c.replies ? `<span class="cmt-btn" style="cursor:default">${c.replies} ответов</span>` : ''}
+                            </div>
+                            <div class="replies" id="replies-${c.id}" hidden></div>
+                        </div>
+                    </div>`).join('')
+                    : '<p class="empty" style="padding:14px 0">Комментариев пока нет — напишите первый.</p>';
+            }
+
+            renderComments();
+
+            page.querySelectorAll('[data-sort]').forEach(btn => btn.addEventListener('click', () => {
+                sortBy = btn.dataset.sort;
+                renderComments();
+            }));
+
+            page.addEventListener('click', async e => {
+                const like = e.target.closest('[data-like]');
+                if (like) {
+                    const cid = Number(like.dataset.like);
+                    const res = await fetch(`/api/comments/${cid}/like`, { method: 'POST', credentials: 'same-origin' });
+                    const data = await res.json();
+                    if (!res.ok) { showToast(data.error || 'Войдите, чтобы ставить лайки'); return; }
+                    const c = comments.find(x => x.id === cid);
+                    c.liked = data.liked;
+                    c.likes = (c.likes || 0) + (data.liked ? 1 : -1);
+                    renderComments();
+                    return;
+                }
+
+                const openBtn = e.target.closest('[data-reply-open]');
+                if (openBtn) {
+                    const cid = Number(openBtn.dataset.replyOpen);
+                    const box = document.getElementById(`replies-${cid}`);
+                    box.hidden = !box.hidden;
+                    if (box.hidden) return;
+                    if (box.dataset.loaded) return;
+                    box.dataset.loaded = '1';
+                    const res = await fetch(`/api/comments/${cid}/replies`, { credentials: 'same-origin' });
+                    if (res.status === 401) { box.innerHTML = '<p class="m-label">Войдите, чтобы отвечать.</p>'; return; }
+                    const { replies } = await res.json();
+                    box.innerHTML = (replies.length ? replies.map(r => `
+                        <div class="reply">
+                            <b>${r.username}</b>
+                            <span class="host">${new Date(r.created_at).toLocaleString('ru-RU')}</span>
+                            <p>${r.text.replace(/</g, '&lt;')}</p>
+                        </div>`).join('') : '') + `
+                        <textarea class="commentInput" placeholder="Ваш ответ…" style="min-height:64px"></textarea>
+                        <button class="btn primary" data-reply-send="${cid}" style="margin-top:8px">Ответить</button>`;
+                }
+            });
+
+            page.addEventListener('click', async e => {
+                const send = e.target.closest('[data-reply-send]');
+                if (!send) return;
+                const cid = Number(send.dataset.replySend);
+                const ta = send.previousElementSibling;
+                const res = await fetch(`/api/comments/${cid}/reply`, {
+                    method: 'POST', credentials: 'same-origin',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text: ta.value }),
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    const box = document.getElementById(`replies-${cid}`);
+                    box.dataset.loaded = '';
+                    showToast('Ответ опубликован');
+                    load();
+                } else showToast(data.error || 'Не удалось отправить');
             });
 
             document.getElementById('sendComment').addEventListener('click', async () => {
                 const input = document.getElementById('commentInput');
                 const msg = document.getElementById('commentMsg');
-                const res = await fetch('/api/tools/' + id + '/comment', {
+                const r = await fetch(`/api/tools/${id}/comment`, {
                     method: 'POST', credentials: 'same-origin',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ text: input.value }),
                 });
-                const data = await res.json();
-                if (res.ok) { input.value = ''; msg.textContent = 'Отправлено ✓'; showToast('Комментарий отправлен ✓'); load(); }
-                else msg.textContent = data.error || 'Ошибка';
+                const data = await r.json();
+                if (r.ok) {
+                    input.value = '';
+                    msg.textContent = 'Комментарий отправлен';
+                    showToast('Комментарий отправлен');
+                    load();
+                } else {
+                    msg.textContent = data.error || 'Не удалось отправить';
+                }
             });
         }
+
         load();
     </script>
 </body>

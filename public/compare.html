@@ -1,85 +1,141 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="ru" data-theme="light" data-mode="auto">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#f2f2ef">
     <title>Сравнение нейросетей — AI Tools Hub</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Unbounded:wght@500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="bg-orbs"><div class="orb orb-1"></div><div class="orb orb-2"></div><div class="orb orb-3"></div></div>
-    <header class="header">
-        <nav class="nav container">
-            <a href="index.html" class="logo">AI<span>Tools</span>Hub</a>
-            <div style="display:flex;gap:10px;align-items:center">
-                <select class="theme-select" id="themeSelect">
-                    <option value="auto">Авто</option><option value="dark">Тёмная</option><option value="light">Светлая</option>
-                </select>
-                <a href="index.html" class="btn-ghost">← Главная</a>
-            </div>
-        </nav>
+    <header class="topbar glass">
+        <a class="brand" href="index.html">AI Tools <em>Hub</em></a>
+        <span class="sp"></span>
+        <button class="theme-toggle" aria-label="Сменить тему">
+            <svg class="i-auto" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.6"/><path d="M12 3.4a8.6 8.6 0 0 1 0 17.2Z" fill="currentColor" stroke="none"/></svg>
+            <svg class="i-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.6v2.2M12 19.2v2.2M2.6 12h2.2M19.2 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6"/></svg>
+            <svg class="i-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 13.2A8.6 8.6 0 0 1 10.8 3a8.6 8.6 0 1 0 10.2 10.2Z"/></svg>
+        </button>
+        <a class="btn" href="index.html">К каталогу</a>
     </header>
 
-    <main class="container section">
-        <h2 class="section-title">⚖️ Сравнение нейросетей</h2>
-        <div class="card glass" style="padding:26px;margin-bottom:24px">
-            <div class="controls" style="margin-bottom:0">
-                <select id="selA" class="theme-select" style="flex:1;min-width:200px"></select>
-                <span style="align-self:center;font-weight:700">VS</span>
-                <select id="selB" class="theme-select" style="flex:1;min-width:200px"></select>
-                <button class="btn-primary-sm" id="compareBtn">Сравнить</button>
-            </div>
+    <main class="wrap hero" style="padding-bottom:20px">
+        <p class="m-label">сравнение</p>
+        <h1 style="margin-bottom:10px">Две нейросети рядом</h1>
+        <p style="color:var(--fg-2);max-width:56ch">Выберите два инструмента — таблица покажет лимиты, скорость, оплату и необходимость VPN.</p>
+
+        <div class="controls" style="margin-top:22px">
+            <select class="select" id="selA" data-grow="1" aria-label="Первый инструмент"></select>
+            <span class="m-label">против</span>
+            <select class="select" id="selB" data-grow="1" aria-label="Второй инструмент"></select>
+            <select class="select" id="selC" data-grow="1" aria-label="Третий инструмент"></select>
+            <button class="btn primary" id="compareBtn">Сравнить</button>
         </div>
-        <div id="compareResult"></div>
+        <p class="m-label" style="margin-top:10px">Можно сравнить до трёх инструментов</p>
+
+        <div id="compareResult" style="margin-top:10px"></div>
     </main>
 
-    <footer class="footer"><p>© 2026 AI Tools Hub</p></footer>
+    <footer class="wrap footer">
+        <span class="m-label">© 2026 AI Tools Hub</span>
+        <a class="m-label" href="index.html">Вернуться в каталог</a>
+    </footer>
+
+    <div id="toast" aria-live="polite"></div>
+
     <script src="toast.js"></script>
     <script src="theme.js"></script>
     <script src="bg.js"></script>
+    <script src="select.js"></script>
+    <script src="motion-loader.js"></script>
+    <script>window.__motion = null; loadMotion().then(m => window.__motion = m);</script>
+    <script src="transitions.js"></script>
+    <script src="palette.js"></script>
     <script>
+        const paymentLabels = { free: 'Бесплатно', freemium: '��������� � ��������', paid: 'Платно' };
         let tools = [];
+
         fetch('/api/tools').then(r => r.json()).then(d => {
             tools = d.tools;
             const opts = tools.map(t => `<option value="${t.id}">${t.name}</option>`).join('');
             document.getElementById('selA').innerHTML = opts;
             document.getElementById('selB').innerHTML = opts;
+            document.getElementById('selC').innerHTML = `<option value="">— третий, необязательно —</option>` + opts;
             document.getElementById('selB').selectedIndex = 1;
+            const p = new URLSearchParams(location.search);
+            if (p.get('a')) document.getElementById('selA').value = p.get('a');
+            if (p.get('b')) document.getElementById('selB').value = p.get('b');
+            if (p.get('c')) document.getElementById('selC').value = p.get('c');
         });
 
+        const speedScore = t => (t.speed.includes('Очень') ? 3 : t.speed === 'Быстро' ? 2 : 1);
+        const catLabels = { text: 'Текст', code: 'Кодинг', art: 'Графика', video: 'Аудио и видео', '3d': '3D', assistant: 'Ассистенты' };
+
         document.getElementById('compareBtn').addEventListener('click', () => {
-            const a = tools.find(t => t.id == document.getElementById('selA').value);
-            const b = tools.find(t => t.id == document.getElementById('selB').value);
-            if (!a || !b || a.id === b.id) {
-                document.getElementById('compareResult').innerHTML = '<p class="empty">Выберите два разных инструмента.</p>';
+            const out = document.getElementById('compareResult');
+            const picked = ['selA', 'selB', 'selC']
+                .map(id => document.getElementById(id).value)
+                .filter(Boolean)
+                .map(v => tools.find(t => t.id == v))
+                .filter(Boolean);
+
+            const unique = [...new Map(picked.map(t => [t.id, t])).values()];
+            if (unique.length < 2) {
+                out.innerHTML = '<div class="panel glass" style="padding:22px"><p>Выберите минимум два разных инструмента.</p></div>';
                 return;
             }
+
             const rows = [
-                ['Категория', a.category, b.category],
-                ['Рейтинг', '★ ' + (a.userAvg ?? a.rating), '★ ' + (b.userAvg ?? b.rating)],
-                ['Оценок', a.ratingsCount ?? 0, b.ratingsCount ?? 0],
-                ['Плюсы', a.pros, b.pros],
-                ['Минусы', a.cons, b.cons],
-                ['Лимиты / цена', a.limits, b.limits],
-                ['Скорость', a.speed, b.speed],
-                ['VPN', a.vpn, b.vpn],
-                ['Бесплатно', a.free ? 'Да' : 'Нет', b.free ? 'Да' : 'Нет'],
-                ['Без регистрации', a.noSignup ? 'Да' : 'Нет', b.noSignup ? 'Да' : 'Нет'],
+                ['категория', t => catLabels[t.category]],
+                ['рейтинг', t => (t.userAvg ?? t.rating).toFixed(1)],
+                ['оценок', t => t.ratingsCount ?? 0],
+                ['плюсы', t => t.pros],
+                ['минусы', t => t.cons],
+                ['лимиты и цена', t => t.limits],
+                ['скорость', t => t.speed],
+                ['оплата', t => paymentLabels[t.payment]],
+                ['доступ', t => t.vpn],
+                ['без регистрации', t => t.noSignup ? 'да' : 'нет'],
             ];
-            const winner = (a.userAvg ?? a.rating) >= (b.userAvg ?? b.rating) ? a : b;
-            const speedWinner = (a.speed.includes('Очень') ? 3 : a.speed === 'Быстро' ? 2 : 1) >= (b.speed.includes('Очень') ? 3 : b.speed === 'Быстро' ? 2 : 1) ? a : b;
-            document.getElementById('compareResult').innerHTML = `
-                <div class="card glass" style="padding:26px;overflow-x:auto;animation:fadeIn .5s ease">
-                    <table style="width:100%;border-collapse:collapse;min-width:560px">
-                        <tr><th style="text-align:left;padding:10px">Параметр</th><th style="padding:10px">${a.name}</th><th style="padding:10px">${b.name}</th></tr>
-                        ${rows.map(r => `<tr><td style="padding:10px;color:var(--muted)">${r[0]}</td><td style="padding:10px;text-align:center">${r[1]}</td><td style="padding:10px;text-align:center">${r[2]}</td></tr>`).join('')}
+
+            const bestRating = unique.reduce((a, b) => ((a.userAvg ?? a.rating) >= (b.userAvg ?? b.rating) ? a : b));
+            const fastest = unique.reduce((a, b) => (speedScore(a) >= speedScore(b) ? a : b));
+            const cheapest = unique.filter(t => t.payment === 'free');
+            const noVpn = unique.filter(t => t.vpn === 'Без VPN');
+
+            const cell = (t, fn) => `<td style="padding:12px;text-align:center;font-size:14.5px">${fn(t)}</td>`;
+
+            out.innerHTML = `
+                <div class="panel glass" style="overflow-x:auto">
+                    <table style="width:100%;border-collapse:collapse;min-width:${180 + unique.length * 200}px">
+                        <thead>
+                            <tr>
+                                <th style="text-align:left;padding:14px 16px;font-weight:550">параметр</th>
+                                ${unique.map(t => `<th style="padding:14px;text-align:center;font-weight:600">${t.name}</th>`).join('')}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${rows.map(([label, fn]) => `
+                                <tr style="border-top:.5px solid var(--line-2)">
+                                    <td style="padding:12px 16px;color:var(--fg-2);font-size:14.5px">${label}</td>
+                                    ${unique.map(t => cell(t, fn)).join('')}
+                                </tr>`).join('')}
+                        </tbody>
                     </table>
                 </div>
-                <div class="card glass" style="padding:26px;margin-top:20px;animation:fadeIn .6s ease">
-                    <h3 style="margin-bottom:10px">🏆 Вердикт AI Tools Hub</h3>
-                    <p style="color:var(--muted)">По рейтингу пользователей лучше: <b style="color:var(--text)">${winner.name}</b>. По скорости удобнее: <b style="color:var(--text)">${speedWinner.name}</b>. Если нужен бесплатный старт без VPN — смотри строку «VPN» и «Бесплатно» выше.</p>
+                <div class="panel glass" style="padding:20px;margin-top:16px">
+                    <p class="m-label" style="margin-bottom:8px">вердикт</p>
+                    <p>Лучший рейтинг — <b>${bestRating.name}</b>, быстрее всех — <b>${fastest.name}</b>${
+                        cheapest.length ? `, бесплатно работают: <b>${cheapest.map(t => t.name).join(', ')}</b>` : ''
+                    }${
+                        noVpn.length ? `, доступны без VPN: <b>${noVpn.map(t => t.name).join(', ')}</b>` : ''
+                    }.</p>
                 </div>`;
+
+            if (window.__motion) {
+                window.__motion.animate(out.firstElementChild, { opacity: [0, 1], y: [14, 0] }, spring());
+            }
         });
     </script>
 </body>

@@ -1,0 +1,13 @@
+node_modules/
+npm-debug.log*
+.DS_Store
+.env
+*.local
+
+# Р‘Р°Р·Р° РґР°РЅРЅС‹С… вЂ” РЅР° СЃРµСЂРІРµСЂРµ СЃРІРѕСЏ, РІ git РµР№ РЅРµ РјРµСЃС‚Рѕ
+database.db
+database.db-journal
+database.db-wal
+database.db-shm
+# Черновики макетов, не нужны в репозитории
+_preview/
