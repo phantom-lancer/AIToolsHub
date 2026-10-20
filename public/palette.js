@@ -34,16 +34,16 @@
     const panel = root.querySelector('.cmd');
 
     const ACTIONS = [
-        { group: 'Навигация', label: 'Каталог', hint: 'все инструменты', icon: '◎', go: () => go('index.html#catalog') },
-        { group: 'Навигация', label: 'Калькулятор', hint: 'сколько стоит', icon: '∑', go: () => go('index.html#calc') },
-        { group: 'Навигация', label: 'Промпты', hint: 'библиотека шаблонов', icon: '❝', go: () => go('prompts.html') },
-        { group: 'Навигация', label: 'Статус сервисов', hint: 'radar', icon: '◉', go: () => go('index.html#radar') },
-        { group: 'Навигация', label: 'Стек-билдер', hint: 'подобрать стек', icon: '⬗', go: () => go('index.html#builder') },
-        { group: 'Навигация', label: 'Сравнение', hint: 'две нейросети', icon: '⇄', go: () => go('compare.html') },
-        { group: 'Навигация', label: 'Что нового', hint: 'changelog', icon: '≡', go: () => go('changelog.html') },
+        { group: 'Навигация', label: 'Каталог', hint: 'все инструменты', icon: '◎', go: () => go('/index.html#catalog') },
+        { group: 'Навигация', label: 'Калькулятор', hint: 'сколько стоит', icon: '∑', go: () => go('/index.html#calc') },
+        { group: 'Навигация', label: 'Промпты', hint: 'библиотека шаблонов', icon: '❝', go: () => go('/prompts.html') },
+        { group: 'Навигация', label: 'Статус сервисов', hint: 'radar', icon: '◉', go: () => go('/index.html#radar') },
+        { group: 'Навигация', label: 'Стек-билдер', hint: 'подобрать стек', icon: '⬗', go: () => go('/index.html#builder') },
+        { group: 'Навигация', label: 'Сравнение', hint: 'две нейросети', icon: '⇄', go: () => go('/compare.html') },
+        { group: 'Навигация', label: 'Что нового', hint: 'changelog', icon: '≡', go: () => go('/changelog.html') },
         { group: 'Действия', label: 'Сменить тему', hint: 'светлая / тёмная', icon: '◐', run: () => document.querySelector('.theme-toggle')?.click() },
-        { group: 'Действия', label: 'Мой профиль', hint: user ? user.username : 'гость', icon: '○', run: () => go('profile.html') },
-        { group: 'Действия', label: 'Инструмент дня', hint: 'новый подбор', icon: '★', go: () => go('index.html#daily') },
+        { group: 'Действия', label: 'Мой профиль', hint: user ? user.username : 'гость', icon: '○', run: () => go('/profile.html') },
+        { group: 'Действия', label: 'Инструмент дня', hint: 'новый подбор', icon: '★', go: () => go('/index.html#daily') },
     ];
 
     function go(url) { window.location.href = url; }

@@ -182,7 +182,7 @@ grid.addEventListener('click', e => {
 
 sheetCompare.addEventListener('click', () => {
     const ids = [...compare];
-    location.href = 'compare.html?a=' + ids[0] + '&b=' + ids[1] + (ids[2] ? '&c=' + ids[2] : '');
+    location.href = '/compare.html?a=' + ids[0] + '&b=' + ids[1] + (ids[2] ? '&c=' + ids[2] : '');
 });
 sheetRoot.querySelectorAll('[data-sheet-close]').forEach(el => el.addEventListener('click', closeSheet));
 addEventListener('keydown', e => { if (e.key === 'Escape') closeSheet(); });
