@@ -544,6 +544,8 @@ document.getElementById('buildBtn').addEventListener('click', async () => {
 });
 
 /* ---------- live radar ---------- */
+const RADAR_SHOWN = 5;
+
 const statusNote = {
     operational: 'Отвечает в норме. Замер — обычный запрос к сайту сервиса.',
     degraded: 'Отвечает, но заметно медленнее обычного. Бывает в часы пик.',
@@ -588,7 +590,7 @@ async function loadRadar() {
                 <span class="dot ${overall}"></span>
                 <b>${headline}</b>
             </p>` +
-            toolStatus.map(s => `
+            toolStatus.slice(0, RADAR_SHOWN).map(s => `
                 <div class="svc" tabindex="0" role="button" aria-expanded="false">
                     <span class="dot ${s.status === 'degraded' ? 'warn' : s.status === 'down' ? 'bad' : s.status === 'blocked' ? 'warn' : ''}"></span>
                     <b>${s.name}</b>
@@ -601,7 +603,35 @@ async function loadRadar() {
                     ${s.error ? `<p style="padding-top:0">${statusReason(s)}</p>` : ''}
                     <p class="m-label" style="padding-top:0">Проверено ${s.checkedAt ? new Date(s.checkedAt).toLocaleString('ru-RU') : '—'} · замеров за сутки: ${s.checks || 0}</p>
                 </div></div>
-            `).join('');
+            `).join('') +
+            (toolStatus.length > RADAR_SHOWN
+                ? `<button class="radar-more" id="radarMore">Показать остальные ${toolStatus.length - RADAR_SHOWN}</button>
+                   <div id="radarRest" hidden>${toolStatus.slice(RADAR_SHOWN).map(s => `
+                <div class="svc" tabindex="0" role="button" aria-expanded="false">
+                    <span class="dot ${s.status === 'degraded' ? 'warn' : s.status === 'down' ? 'bad' : s.status === 'blocked' ? 'warn' : ''}"></span>
+                    <b>${s.name}</b>
+                    <span class="st">${statusLabel(s.status)}</span>
+                    <span class="up">${s.uptime24h !== null ? 'аптайм ' + s.uptime24h + '%' : '—'}</span>
+                    <span class="lat">${s.latency !== null ? s.latency + ' мс' : '—'}</span>
+                </div>
+                <div class="svc-detail"><div>
+                    <p>${statusNote[s.status]}</p>
+                    ${s.error ? `<p style="padding-top:0">${statusReason(s)}</p>` : ''}
+                    <p class="m-label" style="padding-top:0">Проверено ${s.checkedAt ? new Date(s.checkedAt).toLocaleString('ru-RU') : '—'} · замеров за сутки: ${s.checks || 0}</p>
+                </div></div>
+            `).join('')}</div>`
+                : '');
+
+        const moreBtn = document.getElementById('radarMore');
+        if (moreBtn) {
+            moreBtn.addEventListener('click', () => {
+                const rest = document.getElementById('radarRest');
+                rest.hidden = !rest.hidden;
+                moreBtn.textContent = rest.hidden
+                    ? `Показать остальные ${toolStatus.length - RADAR_SHOWN}`
+                    : 'Свернуть список';
+            });
+        }
 
         if (openIdx > -1) {
             const row = box.querySelectorAll('.svc')[openIdx];

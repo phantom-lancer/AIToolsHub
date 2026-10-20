@@ -119,6 +119,15 @@ db.exec(`
         copies INTEGER NOT NULL DEFAULT 0,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP
     );
+    CREATE TABLE IF NOT EXISTS usage_log (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        tool_id INTEGER NOT NULL,
+        day TEXT NOT NULL,
+        count INTEGER NOT NULL DEFAULT 1,
+        UNIQUE (user_id, tool_id, day)
+    );
+    CREATE INDEX IF NOT EXISTS usage_day ON usage_log(user_id, day);
     CREATE TABLE IF NOT EXISTS fact_reports (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         tool_id INTEGER NOT NULL,
@@ -999,6 +1008,69 @@ app.post('/api/calc', (req, res) => {
 });
 
 app.get('/api/calc/workloads', (req, res) => res.json({ workloads: WORKLOADS }));
+
+// ---------- счётчик лимитов ----------
+// Пользователь отмечает, сколько запросов потратил сегодня. Сервис сравнивает
+// с бесплатным лимитом и предупреждает, когда до предела осталось недолго.
+app.post('/api/usage', requireAuth, (req, res) => {
+    const toolId = Number(req.body?.toolId);
+    const delta = Number(req.body?.delta) || 1;
+    if (!getTool(toolId)) return res.status(404).json({ error: 'Инструмент не найден' });
+    if (!Number.isFinite(delta) || Math.abs(delta) > 1000) {
+        return res.status(400).json({ error: 'Некорректное значение' });
+    }
+
+    const day = new Date().toISOString().slice(0, 10);
+    db.prepare(`
+        INSERT INTO usage_log (user_id, tool_id, day, count) VALUES (?, ?, ?, ?)
+        ON CONFLICT(user_id, tool_id, day) DO UPDATE SET count = MAX(0, count + excluded.count)
+    `).run(req.user.id, toolId, day, delta);
+
+    res.json({ ok: true, toolId, day });
+});
+
+app.get('/api/usage', requireAuth, (req, res) => {
+    const day = new Date().toISOString().slice(0, 10);
+    const rows = db.prepare('SELECT tool_id, count FROM usage_log WHERE user_id = ? AND day = ?')
+        .all(req.user.id, day);
+
+    const used = new Map(rows.map(r => [r.tool_id, r.count]));
+
+    // Показываем счётчики по тем сервисам, что пользователь уже взял в стек
+    const stack = db.prepare('SELECT tool_ids FROM saved_stacks WHERE user_id = ?').get(req.user.id);
+    const ids = stack ? JSON.parse(stack.tool_ids) : [];
+    const watched = [...new Set([...ids, ...used.keys()])];
+
+    const items = watched.map(id => {
+        const t = getTool(id);
+        if (!t) return null;
+        const count = used.get(id) || 0;
+        const limit = t.freeValue || 0;
+        const perDay = t.freePeriod === 'день' ? limit
+            : t.freePeriod === '3 часа' ? limit * 8
+                : t.freePeriod === '5 часов' ? Math.round(limit * (24 / 5))
+                    : t.freePeriod === 'месяц' ? Math.round(limit / 30) : 0;
+
+        let state = 'ok';
+        if (perDay > 0 && count >= perDay) state = 'over';
+        else if (perDay > 0 && count >= perDay * 0.8) state = 'near';
+
+        return {
+            toolId: id,
+            name: t.name,
+            domain: t.domain,
+            count,
+            limitPerDay: perDay || null,
+            limitLabel: t.freeValue
+                ? `${t.freeValue} ${t.freeUnit}${t.freePeriod ? ' / ' + t.freePeriod : ''}`
+                : null,
+            state,
+        };
+    }).filter(Boolean);
+
+    res.json({ day, items });
+});
+
 
 // Наблюдения текущего пользователя
 app.get('/api/me/reports', requireAuth, (req, res) => {

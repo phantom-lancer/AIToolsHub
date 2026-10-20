@@ -120,6 +120,12 @@
                 <div class="gal" id="stackGal"></div>
 
                 <div class="phead" id="budget">
+                    <h2>Счётчик лимитов</h2>
+                    <span class="m-label">сколько потрачено сегодня и хватит ли бесплатного тарифа</span>
+                </div>
+                <div class="panel glass" id="usageBox" style="padding:20px"></div>
+
+                <div class="phead" id="budget">
                     <h2>Смета по моему стеку</h2>
                     <span class="m-label">сколько выйдет в месяц, если платить за все платные сервисы из стека</span>
                 </div>
@@ -136,6 +142,12 @@
                     <span class="m-label">факт-чеки, которые вы добавили</span>
                 </div>
                 <div class="panel glass" id="myReports" style="padding:20px"></div>
+
+                <div class="phead" id="recent">
+                    <h2>Недавно смотрели</h2>
+                    <span class="m-label">история просмотров в этом браузере</span>
+                </div>
+                <div class="panel glass" id="recentBox" style="padding:20px"></div>
 
                 <div class="phead"><h2>Данные</h2></div>
                 <div class="panel glass" style="padding:18px;display:flex;gap:10px;flex-wrap:wrap">
@@ -171,6 +183,86 @@
             document.getElementById('stackMeta').textContent = stack.updatedAt
                 ? 'обновлён ' + new Date(stack.updatedAt).toLocaleString('ru-RU')
                 : '';
+
+            /* ---------- недавно смотрели ---------- */
+            const recentBox = document.getElementById('recentBox');
+            try {
+                const seen = JSON.parse(localStorage.getItem('recent-tools') || '[]');
+                recentBox.innerHTML = seen.length
+                    ? `<div class="usage-list">${seen.slice(0, 8).map(s => `
+                        <div class="usage-row" style="grid-template-columns:1fr auto">
+                            <a class="usage-name" href="/tool/${s.id}">${s.name}</a>
+                            <span class="m-label">${new Date(s.at).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}</span>
+                        </div>`).join('')}</div>`
+                    : '<p class="empty">Здесь появятся сервисы, которые вы открывали.</p>';
+            } catch {
+                recentBox.innerHTML = '<p class="empty">Не удалось прочитать историю просмотров.</p>';
+            }
+
+            /* ---------- счётчик лимитов ---------- */
+            const usageBox = document.getElementById('usageBox');
+            try {
+                const usage = await fetch('/api/usage', { credentials: 'same-origin' }).then(r => r.json());
+                if (!usage.items.length) {
+                    usageBox.innerHTML = `<p class="empty">Счётчик пуст. Отмечайте потраченные запросы
+                        кнопкой «+1» на странице сервиса — и здесь увидите, не подобрали ли вы лимит.</p>`;
+                } else {
+                    usageBox.innerHTML = `
+                        <div class="usage-list">
+                            ${usage.items.map(u => `
+                                <div class="usage-row${u.state === 'over' ? ' is-over' : u.state === 'near' ? ' is-near' : ''}">
+                                    <a class="usage-name" href="/tool/${u.toolId}">${u.name}</a>
+                                    <div class="usage-bar">
+                                        <span style="width:${u.limitPerDay
+                                            ? Math.min(100, Math.round(u.count / u.limitPerDay * 100)) : 0}%"></span>
+                                    </div>
+                                    <span class="usage-count">${u.count}${u.limitPerDay ? ' / ' + u.limitPerDay : ''}</span>
+                                    <span class="m-label">${u.limitLabel || 'без лимита'}</span>
+                                    <span class="usage-actions">
+                                        <button data-usage="${u.toolId}" data-delta="-1">−</button>
+                                        <button data-usage="${u.toolId}" data-delta="1">+1</button>
+                                    </span>
+                                </div>`).join('')}
+                        </div>
+                        <p class="m-label" style="margin-top:12px">
+                            ${new Date(usage.day).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })} ·
+                            жёлтым отмечено, что лимит почти исчерпан, красным — что исчерпан.
+                        </p>`;
+
+                    usageBox.querySelectorAll('[data-usage]').forEach(btn => {
+                        btn.addEventListener('click', async () => {
+                            const tid = Number(btn.dataset.usage);
+                            const delta = Number(btn.dataset.delta);
+                            const res = await fetch('/api/usage', {
+                                method: 'POST', credentials: 'same-origin',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ toolId: tid, delta }),
+                            });
+                            if (!res.ok) { showToast('Войдите, чтобы вести счёт'); return; }
+                            loadUsage();
+                        });
+                    });
+                }
+            } catch {
+                usageBox.innerHTML = '<p class="empty">Не удалось загрузить счётчик.</p>';
+            }
+
+            async function loadUsage() {
+                const usage = await fetch('/api/usage', { credentials: 'same-origin' }).then(r => r.json());
+                usageBox.querySelectorAll('.usage-row').forEach(row => {
+                    const btn = row.querySelector('[data-delta="1"]');
+                    if (!btn) return;
+                    const tid = Number(btn.dataset.usage);
+                    const u = usage.items.find(x => x.toolId === tid);
+                    if (!u) return;
+                    const countEl = row.querySelector('.usage-count');
+                    countEl.textContent = u.count + (u.limitPerDay ? ' / ' + u.limitPerDay : '');
+                    const bar = row.querySelector('.usage-bar span');
+                    if (bar) bar.style.width = (u.limitPerDay ? Math.min(100, Math.round(u.count / u.limitPerDay * 100)) : 0) + '%';
+                    row.classList.toggle('is-over', u.state === 'over');
+                    row.classList.toggle('is-near', u.state === 'near');
+                });
+            }
 
             /* ---------- смета по стеку ---------- */
             const watched = [...new Map([...(stack.stack || []), ...(favorites.favorites || [])].map(t => [t.id, t])).values()];

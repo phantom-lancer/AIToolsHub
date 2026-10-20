@@ -130,6 +130,7 @@
                         </div>
                     </div>
                     <span class="sp" style="flex:1"></span>
+                    <button class="btn" id="copyLink" title="Скопировать ссылку">Ссылка</button>
                     <button class="btn" id="favBtn">${isFavorite ? '★ В избранном' : '☆ В избранное'}</button>
                 </div>
 
@@ -279,6 +280,21 @@
                         </section>
 
                         <section class="panel glass side-card">
+                            <p class="m-label" style="margin-bottom:10px">счётчик лимита</p>
+                            <div class="usage-quick">
+                                <button class="btn" id="useMinus" style="flex:1">−1</button>
+                                <div class="usage-quick-count">
+                                    <b id="useCount">0</b>
+                                    <span class="m-label" id="useLimit">сегодня</span>
+                                </div>
+                                <button class="btn primary" id="usePlus" style="flex:1">+1</button>
+                            </div>
+                            <p class="m-label" style="margin-top:10px;line-height:1.5" id="useHint">
+                                Отмечайте потраченные запросы — в профиле увидите, когда упираетесь в лимит.
+                            </p>
+                        </section>
+
+                        <section class="panel glass side-card">
                             <p class="m-label" style="margin-bottom:10px">теги</p>
                             <div class="side-tags">${(tool.tags || []).map(x => `<i>${x}</i>`).join('')}</div>
                         </section>
@@ -308,6 +324,39 @@
                         </p>`;
                 } catch { box.innerHTML = ''; }
             })();
+
+            /* ---------- счётчик лимита на странице сервиса ---------- */
+            async function loadUsage() {
+                try {
+                    const res = await fetch('/api/usage', { credentials: 'same-origin' });
+                    if (!res.ok) { document.getElementById('useHint').textContent = 'Войдите, чтобы вести счёт лимита.'; return; }
+                    const data = await res.json();
+                    const u = data.items.find(x => x.toolId === tool.id);
+                    const count = u ? u.count : 0;
+                    document.getElementById('useCount').textContent = count;
+                    document.getElementById('useLimit').textContent = u && u.limitPerDay
+                        ? `из ${u.limitPerDay} в день`
+                        : (tool.freeValue ? `${tool.freeValue} ${tool.freeUnit || ''}` : 'без лимита');
+                } catch { }
+            }
+
+            async function bump(delta) {
+                const res = await fetch('/api/usage', {
+                    method: 'POST', credentials: 'same-origin',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ toolId: tool.id, delta }),
+                });
+                if (!res.ok) {
+                    const d = await res.json().catch(() => ({}));
+                    showToast(d.error || 'Войдите, чтобы вести счёт');
+                    return;
+                }
+                await loadUsage();
+            }
+
+            document.getElementById('usePlus').addEventListener('click', () => bump(1));
+            document.getElementById('useMinus').addEventListener('click', () => bump(-1));
+            loadUsage();
 
             /* ---------- факт-чеки ---------- */
             async function loadReports() {
@@ -480,6 +529,24 @@
                 document.getElementById('favBtn').textContent = data.favorite ? '★ В избранном' : '☆ В избранное';
                 showToast(data.favorite ? 'Добавлено в избранное' : 'Убрано из избранного');
             });
+
+            document.getElementById('copyLink').addEventListener('click', async () => {
+                const link = location.origin + '/tool/' + tool.id;
+                try {
+                    await navigator.clipboard.writeText(link);
+                    showToast('Ссылка скопирована');
+                } catch {
+                    showToast(link);
+                }
+            });
+
+            // Запоминаем просмотренные сервисы — покажем в профиле
+            try {
+                const KEY = 'recent-tools';
+                const seen = JSON.parse(localStorage.getItem(KEY) || '[]').filter(x => x.id !== tool.id);
+                seen.unshift({ id: tool.id, name: tool.name, at: Date.now() });
+                localStorage.setItem(KEY, JSON.stringify(seen.slice(0, 12)));
+            } catch { }
 
             /* ---------- комментарии: лайки, ответы, сортировка ---------- */
             let sortBy = 'new';
