@@ -39,7 +39,12 @@
         btn.className = 'gselect-btn';
         btn.setAttribute('aria-haspopup', 'listbox');
         btn.setAttribute('aria-expanded', 'false');
-        btn.innerHTML = `<span>${select.options[select.selectedIndex].textContent}</span>${CHEVRON}`;
+        // На момент запуска options могут быть ещё не подставлены скриптом страницы,
+        // поэтому selectedIndex бывает -1 — читаем текст безопасно.
+        const current = select.options[select.selectedIndex];
+        const currentText = current ? current.textContent : (select.getAttribute('data-placeholder') || '');
+
+        btn.innerHTML = `<span>${currentText}</span>${CHEVRON}`;
 
         wrap.appendChild(btn);
         select.after(wrap);
@@ -85,6 +90,16 @@
         menu.hidden = true;
         document.body.appendChild(menu);
         document.querySelectorAll('select').forEach(build);
+
+        // Страницы, которые подставляют options после загрузки, должны
+        // сообщить об этом — иначе в кнопке останется пустое значение.
+        window.__gselectRefresh = () => {
+            document.querySelectorAll('select[data-replaced]').forEach(select => {
+                const btn = select.parentElement?.querySelector('.gselect-btn span');
+                const cur = select.options[select.selectedIndex];
+                if (btn && cur) btn.textContent = cur.textContent;
+            });
+        };
 
         addEventListener('scroll', () => { if (openWrap) place(openWrap.querySelector('.gselect-btn')); }, true);
         addEventListener('resize', () => { if (openWrap) place(openWrap.querySelector('.gselect-btn')); });

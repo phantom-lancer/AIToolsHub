@@ -1,12 +1,24 @@
 <!DOCTYPE html>
-<html lang="ru" data-theme="light" data-mode="auto">
+<html lang="ru" data-mode="auto">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#f2f2ef">
     <title>Инструмент — AI Tools Hub</title>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css">
+    <script>
+      (function(){var r=document.documentElement;try{var m=localStorage.getItem('theme')||'auto';
+      var d=m==='dark'||(m==='auto'&&matchMedia('(prefers-color-scheme: dark)').matches);
+      r.dataset.mode=m;r.dataset.theme=d?'dark':'light';
+      var t=document.querySelector('meta[name="theme-color"]');if(t)t.content=d?'#0d0f13':'#eef0f4';}catch(e){}})();
+    </script>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="/icon-192.png">
+    <link rel="manifest" href="/manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="AI Tools Hub">
+    <link rel="stylesheet" href="/style.css">
 </head>
 <body>
     <header class="topbar glass">
@@ -24,7 +36,7 @@
         <a class="btn" href="index.html#catalog">К каталогу</a>
     </header>
 
-    <main class="wrap hero" style="padding-bottom:20px">
+    <main class="wrap hero tool-wrap" style="padding-bottom:20px">
         <div id="toolPage"></div>
     </main>
 
@@ -35,17 +47,34 @@
 
     <div id="toast" aria-live="polite"></div>
 
-    <script src="toast.js"></script>
-    <script src="theme.js"></script>
-    <script src="bg.js"></script>
-    <script src="motion-loader.js"></script>
+    <script src="/toast.js"></script>
+    <script src="/theme.js"></script>
+    <script src="/bg.js"></script>
+    <script src="/motion-loader.js"></script>
     <script>window.__motion = null; loadMotion().then(m => window.__motion = m);</script>
-    <script src="transitions.js"></script>
-    <script src="palette.js"></script>
+    <script src="/transitions.js"></script>
+    <script src="/palette.js"></script>
     <script>
         const paymentLabels = { free: 'Бесплатно', freemium: 'Бесплатно с лимитами', paid: 'Платно' };
-        const id = new URLSearchParams(location.search).get('id');
+        const plural = (n, one, few, many) => {
+            const m10 = n % 10, m100 = n % 100;
+            if (m10 === 1 && m100 !== 11) return one;
+            if (m10 >= 2 && m10 <= 4 && (m100 < 10 || m100 >= 20)) return few;
+            return many;
+        };
+        // Адрес бывает /tool/12 (красиво, для репостов) и ?id=12 (старый)
+        const pathMatch = location.pathname.match(/\/tool\/(\d+)/);
+        const id = pathMatch ? pathMatch[1] : new URLSearchParams(location.search).get('id');
         let myRating = 0;
+        let allTools = [];
+
+        async function loadAll() {
+            if (allTools.length) return;
+            try {
+                const res = await fetch('/api/tools');
+                allTools = (await res.json()).tools || [];
+            } catch { allTools = []; }
+        }
 
         function starsHtml(value) {
             return [1, 2, 3, 4, 5].map(v => `<span data-v="${v}" class="${v <= value ? 'on' : ''}">★</span>`).join('');
@@ -55,8 +84,12 @@
         }
 
         async function load() {
-            const res = await fetch('/api/tools/' + id, { credentials: 'same-origin' });
             const page = document.getElementById('toolPage');
+            // оба запроса сразу: список нужен для блока «похожие сервисы»
+            const [res] = await Promise.all([
+                fetch('/api/tools/' + id, { credentials: 'same-origin' }),
+                loadAll(),
+            ]);
             if (!res.ok) {
                 page.innerHTML = '<h1>Инструмент не найден</h1><p class="empty" style="margin-top:12px">Вернитесь в каталог и выберите другой сервис.</p>';
                 return;
@@ -64,6 +97,16 @@
             const { tool, ratingsCount, userAvg, comments, myRating: mr, isFavorite } = await res.json();
             myRating = mr;
             document.title = `${tool.name} — AI Tools Hub`;
+
+            const verifiedDays = Math.floor((Date.now() - new Date(tool.verifiedAt || Date.now())) / 86400000);
+            const score = (userAvg ?? tool.rating);
+
+            // Готовим список аналогов: та же категория, кроме текущего
+            allTools = allTools.filter(t => t.id !== tool.id);
+            const siblings = allTools
+                .filter(t => t.category === tool.category)
+                .sort((a, b) => (b.userAvg ?? b.rating) - (a.userAvg ?? a.rating))
+                .slice(0, 4);
 
             page.innerHTML = `
                 <div class="tool-head">
@@ -85,65 +128,289 @@
                     <button class="btn" id="favBtn">${isFavorite ? '★ В избранном' : '☆ В избранное'}</button>
                 </div>
 
-                <div class="panel glass" style="padding:26px;margin-top:22px">
-                    <p style="color:var(--fg-2);font-size:17px">${tool.desc}</p>
+                <div class="tool-grid">
+                    <div class="tool-main">
+                        <section class="panel glass tsec">
+                            <p class="tsec-lead">${tool.desc}</p>
+                            <div class="facts">
+                                <div class="fact">
+                                    <span class="m-label">бесплатный лимит</span>
+                                    <b>${tool.freeValue
+                                        ? `${tool.freeValue} ${tool.freeUnit}${tool.freePeriod ? ' / ' + tool.freePeriod : ''}`
+                                        : (tool.is_free || tool.free ? 'без ограничений' : 'нет')}</b>
+                                </div>
+                                <div class="fact">
+                                    <span class="m-label">цена</span>
+                                    <b>${tool.priceMonth
+                                        ? (tool.priceMonth > 0 ? `$${tool.priceMonth}/мес` : 'бесплатно')
+                                        : '—'}</b>
+                                </div>
+                                <div class="fact">
+                                    <span class="m-label">доступ из РФ</span>
+                                    <b class="${tool.vpn === 'Без VPN' ? 'ok' : 'bad'}">${tool.vpn}</b>
+                                </div>
+                                <div class="fact">
+                                    <span class="m-label">скорость</span>
+                                    <b>${tool.speed}</b>
+                                </div>
+                                <div class="fact">
+                                    <span class="m-label">регистрация</span>
+                                    <b>${tool.noSignup ? 'не нужна' : 'нужна'}</b>
+                                </div>
+                                <div class="fact">
+                                    <span class="m-label">API</span>
+                                    <b>${tool.hasApi ? 'есть' : 'нет'}</b>
+                                </div>
+                                <div class="fact">
+                                    <span class="m-label">русский интерфейс</span>
+                                    <b>${tool.ruUi ? 'есть' : 'нет'}</b>
+                                </div>
+                                <div class="fact">
+                                    <span class="m-label">форматы</span>
+                                    <b>${(tool.formats || []).join(', ') || '—'}</b>
+                                </div>
+                            </div>
+                            ${tool.priceNote ? `<p class="m-label" style="margin-top:14px">${tool.priceNote}</p>` : ''}
+                            ${tool.checkedNote ? `<p class="m-label" style="margin-top:8px;line-height:1.5">${tool.checkedNote}</p>` : ''}
+                        </section>
 
-                    <div class="kv">
-                        <span class="pill">лимиты: ${tool.limits}</span>
+                        <section class="panel glass tsec">
+                            <h2 class="tsec-h">плюсы и минусы</h2>
+                            <div class="proscons">
+                                <div class="pc pc-ok">
+                                    <p class="m-label">плюсы</p>
+                                    <p>${tool.pros}</p>
+                                </div>
+                                <div class="pc pc-bad">
+                                    <p class="m-label">минусы</p>
+                                    <p>${tool.cons}</p>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section class="panel glass tsec">
+                            <h2 class="tsec-h">история изменений</h2>
+                            <div id="toolHistory"><p class="m-label">Загружаю…</p></div>
+                        </section>
+
+                        <section class="panel glass tsec">
+                            <h2 class="tsec-h">факт-чеки: сколько выдаёт на самом деле</h2>
+                            <p class="m-label" style="margin-bottom:14px;line-height:1.5">
+                                Наблюдения посетителей. Если заявленный лимит расходится с тем,
+                                что получается по факту, — это видно здесь.
+                            </p>
+
+                            <div class="fact-sum" id="factSum" hidden></div>
+                            <div id="reportList"><p class="m-label">Загружаю…</p></div>
+
+                            <details class="report-form">
+                                <summary class="m-label">Добавить своё наблюдение</summary>
+                                <div class="report-fields">
+                                    <label class="fld"><span>сколько получилось</span>
+                                        <input type="number" id="repObserved" min="0" placeholder="например, 25"></label>
+                                    <label class="fld"><span>чем мерить</span>
+                                        <input type="text" id="repUnit" maxlength="30" placeholder="сообщений"></label>
+                                    <label class="fld"><span>потрачено минут</span>
+                                        <input type="number" id="repMinutes" min="0" placeholder="необязательно"></label>
+                                </div>
+                                <div class="report-opts">
+                                    <label class="opt"><input type="checkbox" id="repWorks" checked><span>работает</span></label>
+                                    <label class="opt"><input type="checkbox" id="repVpn"><span>нужен VPN</span></label>
+                                </div>
+                                <textarea class="commentInput" id="repNote" maxlength="300"
+                                          placeholder="Что заметили: очередь, отказ, скорость…"></textarea>
+                                <button class="btn primary" id="sendReport" style="margin-top:10px">Отправить наблюдение</button>
+                                <p class="m-label" id="reportMsg" style="margin-top:8px;min-height:1.3em"></p>
+                            </details>
+                        </section>
+
+                        <section class="panel glass tsec">
+                            <h2 class="tsec-h">комментарии · ${comments.length}</h2>
+                            <textarea class="commentInput" id="commentInput" maxlength="500"
+                                      placeholder="Поделитесь впечатлением от работы с сервисом…"></textarea>
+                            <button class="btn primary" id="sendComment" style="margin-top:10px">Отправить</button>
+                            <p class="m-label" id="commentMsg" style="margin-top:8px;min-height:1.3em"></p>
+
+                            <div class="sort-row">
+                                <button class="btn" data-sort="new" style="height:32px;padding:0 13px;font-size:13.5px">Новые</button>
+                                <button class="btn" data-sort="top" style="height:32px;padding:0 13px;font-size:13.5px">Популярные</button>
+                            </div>
+                            <div id="commentsList" style="margin-top:10px"></div>
+                        </section>
                     </div>
 
-                    <div class="kv" style="display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:22px">
-                        <div>
-                            <p class="m-label" style="margin-bottom:6px">плюсы</p>
-                            <p>${tool.pros}</p>
-                        </div>
-                        <div>
-                            <p class="m-label" style="margin-bottom:6px">минусы</p>
-                            <p style="color:var(--fg-2)">${tool.cons}</p>
-                        </div>
-                    </div>
+                    <aside class="tool-side">
+                        <section class="panel glass side-card">
+                            <div class="score-row">
+                                <span class="score">${score.toFixed(1)}</span>
+                                <div>
+                                    <div class="stars-static">${'★'.repeat(Math.round(score))}${'☆'.repeat(5 - Math.round(score))}</div>
+                                    <p class="m-label" style="margin-top:4px">${userAvg
+                                        ? `${ratingsCount} ${ratingsCount === 1 ? 'оценка' : 'оценок'} посетителей`
+                                        : 'оценка редакции'}</p>
+                                </div>
+                            </div>
+                            <div class="stars" id="stars" role="group" aria-label="Поставить оценку"></div>
+                            <p class="m-label" id="rateMsg" style="margin-top:8px;min-height:1.3em"></p>
+                        </section>
 
-                    <div style="margin-top:26px;padding-top:20px;border-top:.5px solid var(--line-2)">
-                        <div class="verified">
-                            <span class="dot ${tool.verifiedAt && Date.now() - new Date(tool.verifiedAt) < 30 * 86400000 ? 'ok' : ''}"></span>
-                            <span>Данные проверены ${new Date(tool.verifiedAt || Date.now()).toLocaleDateString('ru-RU')}
-${Math.floor((Date.now() - new Date(tool.verifiedAt || Date.now())) / 86400000) > 30 ? ' · возможно, устарели' : ''}</span>
-                        </div>
-                    </div>
+                        <section class="panel glass side-card">
+                            <div class="verified">
+                                <span class="dot ${verifiedDays > 30 ? 'warn' : ''}"></span>
+                                <span>${verifiedDays === 0 ? 'сегодня' : verifiedDays + ' ' + plural(verifiedDays, 'день', 'дня', 'дней') + ' назад'}</span>
+                            </div>
+                            <p class="m-label" style="margin-top:8px;line-height:1.5">
+                                ${verifiedDays > 30 ? 'Данные старше месяца — проверьте условия на сайте сервиса.'
+                                    : 'Лимиты и цена перепроверяются вручную.'}
+                            </p>
+                            <div class="live-status" id="liveStatus"></div>
+                        </section>
 
-                    <div style="margin-top:26px;padding-top:20px;border-top:.5px solid var(--line-2)">
-                        <p class="m-label" style="margin-bottom:10px">история изменений</p>
-                        <div id="toolHistory"><p class="m-label">Загружаю…</p></div>
-                    </div>
+                        <section class="panel glass side-card">
+                            <p class="m-label" style="margin-bottom:10px">похожие сервисы</p>
+                            <div class="similar" id="similar"></div>
+                            <a class="btn" style="width:100%;margin-top:16px;justify-content:center"
+                               href="compare.html?a=${tool.id}">Сравнить с другими</a>
+                        </section>
 
-                    <div style="margin-top:26px;padding-top:20px;border-top:.5px solid var(--line-2)">
-                        <div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap">
-                            <span style="font-family:var(--mono);font-size:26px">${(userAvg ?? tool.rating).toFixed(1)}</span>
-                            <span class="m-label">${userAvg
-                                ? `из 5 · средняя по ${ratingsCount} ${ratingsCount === 1 ? 'оценке' : 'оценкам'} посетителей`
-                                : 'из 5 · оценка редакции, посетители ещё не голосовали'}</span>
-                        </div>
-                        <p class="m-label" style="margin:16px 0 6px">ваша оценка</p>
-                        <div class="stars" id="stars" role="group" aria-label="Поставить оценку"></div>
-                        <p class="m-label" id="rateMsg" style="margin-top:8px;min-height:1.3em"></p>
-                    </div>
-
-                    <div style="margin-top:26px;padding-top:20px;border-top:.5px solid var(--line-2)">
-                        <p class="m-label" style="margin-bottom:10px">комментарии · ${comments.length}</p>
-                        <textarea class="commentInput" id="commentInput" maxlength="500"
-                                  placeholder="Поделитесь впечатлением от работы с сервисом…"></textarea>
-                        <button class="btn primary" id="sendComment" style="margin-top:10px">Отправить</button>
-                        <p class="m-label" id="commentMsg" style="margin-top:8px;min-height:1.3em"></p>
-
-                        <div class="sort-row">
-                            <button class="btn" data-sort="new" style="height:32px;padding:0 13px;font-size:13.5px">Новые</button>
-                            <button class="btn" data-sort="top" style="height:32px;padding:0 13px;font-size:13.5px">Популярные</button>
-                        </div>
-                        <div id="commentsList" style="margin-top:10px"></div>
-                    </div>
+                        <section class="panel glass side-card">
+                            <p class="m-label" style="margin-bottom:10px">теги</p>
+                            <div class="side-tags">${(tool.tags || []).map(x => `<i>${x}</i>`).join('')}</div>
+                        </section>
+                    </aside>
                 </div>`;
 
             renderStars();
+
+            /* ---------- живой статус этого сервиса ---------- */
+            (async () => {
+                const box = document.getElementById('liveStatus');
+                if (!box) return;
+                try {
+                    const { tools } = await fetch('/api/radar').then(r => r.json());
+                    const st = (tools || []).find(t => t.toolId === tool.id);
+                    if (!st || st.status === 'unknown') { box.innerHTML = ''; return; }
+                    const label = { operational: 'Отвечает', degraded: 'Замедлен', down: 'Недоступен', blocked: 'Нужен VPN' }[st.status];
+                    box.innerHTML = `
+                        <div class="live-row">
+                            <span class="dot ${st.status === 'operational' ? '' : st.status === 'down' ? 'bad' : 'warn'}"></span>
+                            <span>${label}</span>
+                            <span class="m-label">${st.latency !== null ? st.latency + ' мс' : '—'}</span>
+                        </div>
+                        <p class="m-label" style="margin-top:6px;line-height:1.5">
+                            Проверка ${st.checkedAt ? new Date(st.checkedAt).toLocaleString('ru-RU') : '—'}
+                            ${st.uptime24h !== null ? `· аптайм за сутки ${st.uptime24h}%` : ''}
+                        </p>`;
+                } catch { box.innerHTML = ''; }
+            })();
+
+            /* ---------- факт-чеки ---------- */
+            async function loadReports() {
+                const list = document.getElementById('reportList');
+                const sum = document.getElementById('factSum');
+                const claim = tool.freeValue;
+                try {
+                    const { reports, summary } = await fetch(`/api/tools/${tool.id}/reports`).then(r => r.json());
+
+                    if (summary) {
+                        sum.hidden = false;
+                        sum.innerHTML = `
+                            <div class="fs-item"><span class="m-label">по наблюдениям</span><b>${summary.median} ${tool.freeUnit || ''}</b></div>
+                            <div class="fs-item"><span class="m-label">разброс</span><b>${summary.min}–${summary.max}</b></div>
+                            <div class="fs-item"><span class="m-label">наблюдений</span><b>${summary.count}</b></div>
+                            ${claim ? `<div class="fs-item ${summary.median < claim ? 'is-worse' : 'is-better'}">
+                                <span class="m-label">заявлено</span><b>${claim} ${tool.freeUnit || ''}</b></div>` : ''}`;
+                    }
+
+                    if (!reports.length) {
+                        list.innerHTML = `<p class="m-label">Наблюдений пока нет. ${claim
+                            ? 'Заявленный лимит — ' + claim + ' ' + (tool.freeUnit || '') + '.'
+                            : ''} Станьте первым, кто зафиксирует факт.</p>`;
+                        return;
+                    }
+
+                    list.innerHTML = reports.map(r => `
+                        <div class="report">
+                            <div class="report-top">
+                                ${r.avatar
+                                    ? `<img class="avatar" style="width:26px;height:26px" src="${r.avatar}" alt="">`
+                                    : `<span class="avatar-initial" style="width:26px;height:26px;font-size:11px">${r.username[0].toUpperCase()}</span>`}
+                                <b>${r.username}</b>
+                                <span class="m-label">${new Date(r.created_at).toLocaleDateString('ru-RU')}</span>
+                                <span style="flex:1"></span>
+                                ${r.observed !== null ? `<span class="report-num">${r.observed} ${r.unit || tool.freeUnit || ''}</span>` : ''}
+                            </div>
+                            <div class="report-tags">
+                                ${r.works ? '<span class="rt ok">работает</span>' : '<span class="rt bad">не работает</span>'}
+                                ${r.needsVpn ? '<span class="rt warn">нужен VPN</span>' : ''}
+                                ${r.minutes ? `<span class="rt">${r.minutes} мин</span>` : ''}
+                            </div>
+                            ${r.note ? `<p class="report-note">${r.note.replace(/</g, '&lt;')}</p>` : ''}
+                            <div class="report-votes">
+                                <button class="rv" data-report="${r.id}" data-agree="1">Подтверждаю · ${r.confirms}</button>
+                                <button class="rv" data-report="${r.id}" data-agree="0">Не подтверждаю</button>
+                            </div>
+                        </div>`).join('');
+
+                    list.querySelectorAll('[data-report]').forEach(btn => {
+                        btn.addEventListener('click', async () => {
+                            const rid = Number(btn.dataset.report);
+                            const agree = Number(btn.dataset.agree);
+                            const res = await fetch(`/api/reports/${rid}/confirm`, {
+                                method: 'POST', credentials: 'same-origin',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ agrees: agree }),
+                            });
+                            const data = await res.json();
+                            if (!res.ok) { showToast(data.error || 'Войдите, чтобы подтверждать'); return; }
+                            loadReports();
+                        });
+                    });
+                } catch {
+                    list.innerHTML = '<p class="m-label">Не удалось загрузить наблюдения.</p>';
+                }
+            }
+
+            loadReports();
+
+            document.getElementById('sendReport').addEventListener('click', async () => {
+                const body = {
+                    observed: document.getElementById('repObserved').value,
+                    unit: document.getElementById('repUnit').value,
+                    minutes: document.getElementById('repMinutes').value,
+                    works: document.getElementById('repWorks').checked,
+                    needsVpn: document.getElementById('repVpn').checked,
+                    note: document.getElementById('repNote').value,
+                };
+                const res = await fetch(`/api/tools/${tool.id}/report`, {
+                    method: 'POST', credentials: 'same-origin',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body),
+                });
+                const data = await res.json();
+                const msg = document.getElementById('reportMsg');
+                if (res.ok) {
+                    msg.textContent = 'Спасибо, наблюдение опубликовано';
+                    showToast('Наблюдение добавлено');
+                    ['repObserved', 'repUnit', 'repMinutes', 'repNote'].forEach(id => document.getElementById(id).value = '');
+                    loadReports();
+                } else {
+                    msg.textContent = data.error || 'Не удалось отправить';
+                }
+            });
+
+            document.getElementById('similar').innerHTML = siblings.length
+                ? siblings.map(t => `
+                    <a class="sim-row" href="/tool/${t.id}">
+                        <img src="https://www.google.com/s2/favicons?domain=${t.domain}&sz=64" alt=""
+                             onerror="this.style.visibility='hidden'">
+                        <span class="sim-txt">
+                            <b>${t.name}</b>
+                            <span class="m-label">${t.limits}</span>
+                        </span>
+                        <span class="sim-rate">${(t.userAvg ?? t.rating).toFixed(1)}</span>
+                    </a>`).join('')
+                : '<p class="m-label">В этой категории пока только этот сервис.</p>';
 
             /* ---------- история изменений: главная ценность каталога ---------- */
             (async () => {
@@ -153,6 +420,8 @@ ${Math.floor((Date.now() - new Date(tool.verifiedAt || Date.now())) / 86400000) 
                     const FIELD = {
                         limits: 'Лимиты', payment: 'Оплата', vpn: 'Доступ',
                         speed: 'Скорость', desc: 'Описание', pros: 'Плюсы', cons: 'Минусы',
+                        free_limit: 'Бесплатный лимит', price: 'Цена', access: 'Доступ',
+                        feature: 'Возможности', name: 'Название',
                     };
                     if (!history.length) {
                         box.innerHTML = `<p class="m-label">С момента запуска проекта изменений не было —

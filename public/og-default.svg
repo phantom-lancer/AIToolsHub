@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0b1020"/>
+      <stop offset=".55" stop-color="#111a35"/>
+      <stop offset="1" stop-color="#1b1440"/>
+    </linearGradient>
+    <radialGradient id="g1" cx=".18" cy=".15" r=".8">
+      <stop offset="0" stop-color="#0a84ff" stop-opacity=".42"/>
+      <stop offset="1" stop-color="#0a84ff" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="g2" cx=".85" cy=".9" r=".75">
+      <stop offset="0" stop-color="#7c5cff" stop-opacity=".38"/>
+      <stop offset="1" stop-color="#7c5cff" stop-opacity="0"/>
+    </radialGradient>
+    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
+      <path d="M48 0H0v48" fill="none" stroke="#ffffff" stroke-opacity=".05"/>
+    </pattern>
+  </defs>
+
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <rect width="1200" height="630" fill="url(#grid)"/>
+  <rect width="1200" height="630" fill="url(#g1)"/>
+  <rect width="1200" height="630" fill="url(#g2)"/>
+
+  <g transform="translate(84,150)">
+    <rect width="76" height="76" rx="22" fill="#ffffff" fill-opacity=".1" stroke="#ffffff" stroke-opacity=".16"/>
+    <text x="38" y="50" font-family="Segoe UI,Inter,sans-serif" font-size="30" font-weight="600"
+          fill="#eaf0ff" text-anchor="middle">AI</text>
+    <text x="100" y="34" font-family="Segoe UI,Inter,sans-serif" font-size="24" fill="#9fb0d0">AI Tools Hub</text>
+    <text x="100" y="70" font-family="Segoe UI,Inter,sans-serif" font-size="46" font-weight="700" fill="#f4f7ff">
+      Честные лимиты и цены
+    </text>
+    <text x="100" y="116" font-family="Segoe UI,Inter,sans-serif" font-size="27" fill="#c3cfe6">
+      Отметка про VPN и живой статус API
+    </text>
+  </g>
+
+  <g transform="translate(84,392)" font-family="Segoe UI,Inter,sans-serif" font-size="22">
+    <rect width="228" height="52" rx="26" fill="#5ec27a" fill-opacity=".14" stroke="#5ec27a" stroke-opacity=".4"/>
+    <text x="26" y="34" fill="#8fe3a6">доступ без VPN</text>
+
+    <rect x="252" width="212" height="52" rx="26" fill="#e0b054" fill-opacity=".14" stroke="#e0b054" stroke-opacity=".4"/>
+    <text x="278" y="34" fill="#f0d09a">лимиты урезали</text>
+
+    <rect x="488" width="216" height="52" rx="26" fill="#0a84ff" fill-opacity=".16" stroke="#0a84ff" stroke-opacity=".45"/>
+    <text x="514" y="34" fill="#9dcbff">история изменений</text>
+  </g>
+
+  <text x="84" y="556" font-family="IBM Plex Mono,ui-monospace,monospace" font-size="22" fill="#7e8fb0">
+    24 сервиса · история условий · без рекламы
+  </text>
+</svg>

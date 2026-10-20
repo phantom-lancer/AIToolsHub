@@ -1,0 +1,23 @@
+{
+  "name": "AI Tools Hub — каталог нейросетей",
+  "short_name": "AI Tools",
+  "description": "Честные лимиты, цены и отметка про VPN для 24 ИИ-сервисов, живой статус API и история изменений условий.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0d0f13",
+  "theme_color": "#0d0f13",
+  "lang": "ru",
+  "categories": ["productivity", "utilities"],
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Каталог", "url": "/#catalog" },
+    { "name": "Подбор под задачу", "url": "/#daily" },
+    { "name": "Сравнить", "url": "/compare.html" }
+  ]
+}

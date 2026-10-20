@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ru" data-theme="light" data-mode="auto">
+<html lang="ru" data-mode="auto">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -8,7 +8,19 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css">
+    <script>
+      (function(){var r=document.documentElement;try{var m=localStorage.getItem('theme')||'auto';
+      var d=m==='dark'||(m==='auto'&&matchMedia('(prefers-color-scheme: dark)').matches);
+      r.dataset.mode=m;r.dataset.theme=d?'dark':'light';
+      var t=document.querySelector('meta[name="theme-color"]');if(t)t.content=d?'#0d0f13':'#eef0f4';}catch(e){}})();
+    </script>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="/icon-192.png">
+    <link rel="manifest" href="/manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="AI Tools Hub">
+    <link rel="stylesheet" href="/style.css">
 </head>
 <body>
     <header class="topbar glass">
@@ -40,13 +52,13 @@
 
     <div id="toast" aria-live="polite"></div>
 
-    <script src="toast.js"></script>
-    <script src="theme.js"></script>
-    <script src="bg.js"></script>
-    <script src="motion-loader.js"></script>
+    <script src="/toast.js"></script>
+    <script src="/theme.js"></script>
+    <script src="/bg.js"></script>
+    <script src="/motion-loader.js"></script>
     <script>window.__motion = null; loadMotion().then(m => window.__motion = m);</script>
-    <script src="transitions.js"></script>
-    <script src="palette.js"></script>
+    <script src="/transitions.js"></script>
+    <script src="/palette.js"></script>
     <script>
         fetch('/api/changelog').then(r => r.json()).then(({ changelog }) => {
             document.getElementById('log').innerHTML = changelog.map(item => `

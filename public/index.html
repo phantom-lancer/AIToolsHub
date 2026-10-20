@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ru" data-theme="light" data-mode="auto">
+<html lang="ru" data-mode="auto">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -8,13 +8,26 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css">
+    <script>
+      (function(){var r=document.documentElement;try{var m=localStorage.getItem('theme')||'auto';
+      var d=m==='dark'||(m==='auto'&&matchMedia('(prefers-color-scheme: dark)').matches);
+      r.dataset.mode=m;r.dataset.theme=d?'dark':'light';
+      var t=document.querySelector('meta[name="theme-color"]');if(t)t.content=d?'#0d0f13':'#eef0f4';}catch(e){}})();
+    </script>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="/icon-192.png">
+    <link rel="manifest" href="/manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="AI Tools Hub">
+    <link rel="stylesheet" href="/style.css">
 </head>
 <body>
     <header class="topbar glass">
         <a class="brand" href="#top"><span class="dotmark">AI</span>AI Tools Hub</a>
         <nav class="mainnav">
             <a href="#catalog">Каталог</a>
+            <a href="#calc">Калькулятор</a>
             <a href="#radar">Статус</a>
             <a href="#builder">Стек-билдер</a>
             <a href="compare.html">Сравнение</a>
@@ -37,12 +50,12 @@
 
     <main id="top">
         <section class="wrap hero">
-            <span class="badge glass"><span class="pulse"></span>24 сервиса · статус API проверяется каждые 5 минут</span>
-            <h1>Подберём нейросеть под задачу и покажем её реальные ограничения</h1>
-            <p class="lead">Опиши, что делаешь — получишь три подходящих инструмента. По каждому видно, что бесплатно, где нужен VPN, сколько стоит и отвечает ли API прямо сейчас.</p>
+            <span class="badge glass"><span class="pulse"></span>24 сервиса · лимиты и цены в цифрах · статус проверяется каждые 5 минут</span>
+            <h1>Посчитай, во сколько обойдётся твоя работа с нейросетями</h1>
+            <p class="lead">Введи объём — увидишь, какие сервисы укладываются в бесплатный лимит, а где придётся платить. По каждому видно, сколько выдают на самом деле, нужен ли VPN и что изменилось у провайдера за последние месяцы.</p>
             <div class="actions">
-                <button class="btn primary" id="quizBtn">Подобрать под задачу</button>
-                <button class="btn" id="luckyBtn">Случайный инструмент</button>
+                <a class="btn primary" href="#calc">Посчитать стоимость</a>
+                <button class="btn" id="quizBtn">Подобрать под задачу</button>
                 <a class="btn" href="#builder">Собрать стек</a>
                 <a class="btn" href="compare.html">Сравнить два</a>
             </div>
@@ -51,18 +64,18 @@
             <div class="panel glass how" id="how">
                 <div class="how-step">
                     <span class="how-n">1</span>
-                    <b>Ответь на два вопроса</b>
-                    <span>Что делаешь и что важнее: цена, скорость или доступ без VPN.</span>
+                    <b>Считаешь объём</b>
+                    <span>Сколько запросов, картинок или минут озвучки в день либо в месяц.</span>
                 </div>
                 <div class="how-step">
                     <span class="how-n">2</span>
-                    <b>Получишь три варианта</b>
-                    <span>С объяснением, почему они подходят: цена, VPN, скорость, рейтинг.</span>
+                    <b>Видишь, где выгодно</b>
+                    <span>Кто укладывается в бесплатный лимит, а где придётся платить.</span>
                 </div>
                 <div class="how-step">
                     <span class="how-n">3</span>
-                    <b>Сравнишь и сохранишь</b>
-                    <span>Откроешь страницу каждого, соберёшь свой стек в профиле.</span>
+                    <b>Проверяешь факты</b>
+                    <span>Живой статус, история изменений лимитов и наблюдения других.</span>
                 </div>
             </div>
 
@@ -117,10 +130,10 @@
                     <span></span>
                     <span class="m-label">инструмент</span>
                     <span class="m-label">для чего</span>
+                    <span class="m-label">лимиты и цена</span>
                     <span class="m-label">оплата</span>
                     <span class="m-label">доступ</span>
                     <span class="m-label" style="text-align:right">рейтинг</span>
-                    <span></span>
                 </div>
                 <div class="list" id="grid"></div>
             </div>
@@ -134,6 +147,42 @@
                 <p>Один инструмент и готовая подсказка — каждый день новый.</p>
             </div>
             <div class="panel glass daily" id="dailyBox"></div>
+        </section>
+
+        <section class="wrap section" id="calc">
+            <div class="sec-head">
+                <p class="m-label">калькулятор</p>
+                <h2>Сколько это будет стоить</h2>
+                <p>Введите объём работы — покажем, какие сервисы укладываются в бесплатный лимит, а где придётся платить.</p>
+            </div>
+
+            <div class="panel glass calc">
+                <div class="calc-controls">
+                    <label class="fld">
+                        <span>что делаем</span>
+                        <select id="calcWork" class="select" data-grow="1">
+                            <option value="text">запросы к чату</option>
+                            <option value="image">картинки</option>
+                            <option value="video">видео</option>
+                            <option value="audio">озвучка</option>
+                            <option value="code">автодополнение кода</option>
+                            <option value="3d">3D-модели</option>
+                        </select>
+                    </label>
+                    <label class="fld">
+                        <span>сколько <span class="period-toggle">
+                            <button type="button" data-period="day">в день</button>
+                            <button type="button" data-period="month" class="is-on">в месяц</button>
+                        </span></span>
+                        <input type="number" id="calcVolume" value="100" min="1" max="1000000">
+                    </label>
+                    <div class="calc-opts">
+                        <label class="opt"><input type="checkbox" id="calcFree"><span>только бесплатные</span></label>
+                        <label class="opt"><input type="checkbox" id="calcVpn"><span>без VPN</span></label>
+                    </div>
+                </div>
+                <div class="calc-out" id="calcOut"></div>
+            </div>
         </section>
 
         <section class="wrap section" id="community">
@@ -196,6 +245,10 @@
         <a href="#catalog" aria-current="page">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="3" y="3" width="7.5" height="7.5" rx="2.2"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="2.2"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="2.2"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="2.2"/></svg>
             Каталог
+        </a>
+        <a href="#calc">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="3"/><path d="M8 7h8M8 12h2M14 12h2M8 16h2M14 16h2"/></svg>
+            Счёт
         </a>
         <a href="#daily">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="m12 3 2.6 5.6 6 .8-4.4 4.3 1.1 6.1-5.3-3-5.3 3 1.1-6.1L3.4 9.4l6-.8Z"/></svg>
@@ -261,14 +314,14 @@
         </div>
     </div>
 
-    <script src="toast.js"></script>
-    <script src="theme.js"></script>
-    <script src="bg.js"></script>
-    <script src="select.js"></script>
-    <script src="motion-loader.js"></script>
+    <script src="/toast.js"></script>
+    <script src="/theme.js"></script>
+    <script src="/bg.js"></script>
+    <script src="/select.js"></script>
+    <script src="/motion-loader.js"></script>
     <script>window.__motion = null; loadMotion().then(m => window.__motion = m);</script>
-    <script src="transitions.js"></script>
-    <script src="palette.js"></script>
-    <script src="script.js"></script>
+    <script src="/transitions.js"></script>
+    <script src="/palette.js"></script>
+    <script src="/script.js"></script>
 </body>
 </html>

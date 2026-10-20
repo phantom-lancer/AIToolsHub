@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ru" data-theme="light" data-mode="auto">
+<html lang="ru" data-mode="auto">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -8,13 +8,25 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css">
+    <script>
+      (function(){var r=document.documentElement;try{var m=localStorage.getItem('theme')||'auto';
+      var d=m==='dark'||(m==='auto'&&matchMedia('(prefers-color-scheme: dark)').matches);
+      r.dataset.mode=m;r.dataset.theme=d?'dark':'light';
+      var t=document.querySelector('meta[name="theme-color"]');if(t)t.content=d?'#0d0f13':'#eef0f4';}catch(e){}})();
+    </script>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="/icon-192.png">
+    <link rel="manifest" href="/manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="AI Tools Hub">
+    <link rel="stylesheet" href="/style.css">
 </head>
 <body>
     <header class="topbar glass">
         <a class="brand" href="index.html"><span class="dotmark">AI</span>AI Tools Hub</a>
         <span class="sp"></span>
-        <button class="btn quiet" data-open-cmd title="��������� ������� � ?K">
+        <button class="btn quiet" data-open-cmd title="��������� ������� � ?K">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/></svg>
             <span class="cmd-hint">?K</span>
         </button>
@@ -37,14 +49,14 @@
 
     <div id="toast" aria-live="polite"></div>
 
-    <script src="toast.js"></script>
-    <script src="theme.js"></script>
-    <script src="bg.js"></script>
-    <script src="select.js"></script>
-    <script src="motion-loader.js"></script>
+    <script src="/toast.js"></script>
+    <script src="/theme.js"></script>
+    <script src="/bg.js"></script>
+    <script src="/select.js"></script>
+    <script src="/motion-loader.js"></script>
     <script>window.__motion = null; loadMotion().then(m => window.__motion = m);</script>
-    <script src="transitions.js"></script>
-    <script src="palette.js"></script>
+    <script src="/transitions.js"></script>
+    <script src="/palette.js"></script>
     <script>
         const box = document.getElementById('profileBox');
         const PENCIL = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9a2.5 2.5 0 0 0-3.5-3.5L4.5 16.5V20Z"/><path d="M14.5 6.5 17.5 9.5"/></svg>';
@@ -107,6 +119,24 @@
                 </div>
                 <div class="gal" id="stackGal"></div>
 
+                <div class="phead" id="budget">
+                    <h2>Смета по моему стеку</h2>
+                    <span class="m-label">сколько выйдет в месяц, если платить за все платные сервисы из стека</span>
+                </div>
+                <div class="panel glass" id="budgetBox" style="padding:20px"></div>
+
+                <div class="phead" id="watch">
+                    <h2>Что изменилось у моих сервисов</h2>
+                    <span class="m-label">история по инструментам из стека и избранного</span>
+                </div>
+                <div class="panel glass" id="watchBox" style="padding:20px"></div>
+
+                <div class="phead" id="reports">
+                    <h2>Мои наблюдения</h2>
+                    <span class="m-label">факт-чеки, которые вы добавили</span>
+                </div>
+                <div class="panel glass" id="myReports" style="padding:20px"></div>
+
                 <div class="phead"><h2>Данные</h2></div>
                 <div class="panel glass" style="padding:18px;display:flex;gap:10px;flex-wrap:wrap">
                     <button class="btn" id="exportBtn">Экспорт закладок</button>
@@ -122,7 +152,7 @@
             const favGal = document.getElementById('favGal');
             favGal.innerHTML = favorites.favorites.length
                 ? favorites.favorites.map(t => `
-                    <a class="tile" href="tool.html?id=${t.id}">
+                    <a class="tile" href="/tool/${t.id}">
                         <span class="mark">${logo(t)}</span>
                         <b>${t.name}</b>
                         <small>${t.domain}</small>
@@ -132,7 +162,7 @@
             const stackGal = document.getElementById('stackGal');
             stackGal.innerHTML = stack.stack && stack.stack.length
                 ? stack.stack.map(t => `
-                    <a class="tile" href="tool.html?id=${t.id}">
+                    <a class="tile" href="/tool/${t.id}">
                         <span class="mark">${logo(t)}</span>
                         <b>${t.name}</b>
                         <small>★ ${t.rating}</small>
@@ -141,6 +171,73 @@
             document.getElementById('stackMeta').textContent = stack.updatedAt
                 ? 'обновлён ' + new Date(stack.updatedAt).toLocaleString('ru-RU')
                 : '';
+
+            /* ---------- смета по стеку ---------- */
+            const watched = [...new Map([...(stack.stack || []), ...(favorites.favorites || [])].map(t => [t.id, t])).values()];
+            const budgetBox = document.getElementById('budgetBox');
+            const paid = watched.filter(t => t.priceMonth > 0);
+            const free = watched.filter(t => !t.priceMonth);
+            const monthly = paid.reduce((s, t) => s + t.priceMonth, 0);
+
+            budgetBox.innerHTML = watched.length
+                ? `<div class="budget-grid">
+                        <div class="budget-total">
+                            <span class="m-label">в месяц, если платить за всё</span>
+                            <b>$${monthly.toFixed(0)}</b>
+                            <p class="m-label">${paid.length} платных из ${watched.length} в стеке</p>
+                        </div>
+                        <div class="budget-list">
+                            ${watched.map(t => `
+                                <div class="budget-row">
+                                    <a href="/tool/${t.id}">${t.name}</a>
+                                    <span class="m-label">${t.limits || ''}</span>
+                                    <span class="budget-price">${t.priceMonth > 0 ? '$' + t.priceMonth + '/мес' : 'бесплатно'}</span>
+                                </div>`).join('')}
+                        </div>
+                    </div>
+                    ${free.length ? `<p class="m-label" style="margin-top:14px">Бесплатных в стеке: ${free.map(t => t.name).join(', ')}. Их можно не оплачивать вообще.</p>` : ''}`
+                : '<p class="empty">Соберите стек — посчитаем, во сколько обойдётся подписка на все сервисы сразу.</p>';
+
+            /* ---------- что изменилось у моих сервисов ---------- */
+            const watchBox = document.getElementById('watchBox');
+            if (!watched.length) {
+                watchBox.innerHTML = '<p class="empty">Пока нечего показывать. Добавьте сервисы в стек или избранное.</p>';
+            } else {
+                const changes = [];
+                for (const t of watched) {
+                    try {
+                        const { history } = await fetch(`/api/tools/${t.id}/history`).then(r => r.json());
+                        history.slice(0, 3).forEach(h => changes.push({ tool: t, ...h }));
+                    } catch { }
+                }
+                changes.sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+                watchBox.innerHTML = changes.length
+                    ? changes.map(c => `
+                        <div class="watch-row">
+                            <a class="watch-tool" href="/tool/${c.tool.id}">${c.tool.name}</a>
+                            <span class="m-label">${c.field}</span>
+                            <p class="watch-change"><s>${c.old_value || '—'}</s> → <b>${c.new_value}</b></p>
+                            <span class="m-label">${new Date(c.created_at).toLocaleDateString('ru-RU')}</span>
+                        </div>`).join('')
+                    : '<p class="empty">У ваших сервисов пока не было зафиксировано изменений.</p>';
+            }
+
+            /* ---------- мои наблюдения ---------- */
+            const myReports = document.getElementById('myReports');
+            try {
+                const mine = await fetch('/api/me/reports', { credentials: 'same-origin' }).then(r => r.json());
+                myReports.innerHTML = mine.reports && mine.reports.length
+                    ? mine.reports.map(r => `
+                        <div class="watch-row">
+                            <a class="watch-tool" href="/tool/${r.toolName}">${r.toolName}</a>
+                            <span class="m-label">${r.observed !== null ? r.observed + ' ' + (r.unit || '') : 'заметка'}</span>
+                            <p class="watch-change">${r.works ? 'работает' : 'не работает'}${r.needsVpn ? ', нужен VPN' : ''}</p>
+                            <span class="m-label">${new Date(r.created_at).toLocaleDateString('ru-RU')}</span>
+                        </div>`).join('')
+                    : '<p class="empty">Вы ещё не добавляли наблюдений. Их можно отправлять на странице любого инструмента.</p>';
+            } catch {
+                myReports.innerHTML = '<p class="empty">Не удалось загрузить наблюдения.</p>';
+            }
 
             /* ---------- аватар: наведение и перетаскивание ---------- */
             const drop = document.getElementById('avatarDrop');

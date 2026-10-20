@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ru" data-theme="light" data-mode="auto">
+<html lang="ru" data-mode="auto">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -9,7 +9,13 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css">
+    <script>
+      (function(){var r=document.documentElement;try{var m=localStorage.getItem('theme')||'auto';
+      var d=m==='dark'||(m==='auto'&&matchMedia('(prefers-color-scheme: dark)').matches);
+      r.dataset.mode=m;r.dataset.theme=d?'dark':'light';
+      var t=document.querySelector('meta[name="theme-color"]');if(t)t.content=d?'#0d0f13':'#eef0f4';}catch(e){}})();
+    </script>
+    <link rel="stylesheet" href="/style.css">
 </head>
 <body>
     <header class="topbar glass">
@@ -49,6 +55,8 @@
                 </div>
                 <button class="btn quiet" id="refreshBtn">Обновить</button>
             </div>
+
+            <div class="admin-stats" id="stats"></div>
 
             <div class="admin-layout">
                 <aside class="admin-list" id="toolList" aria-label="Список инструментов"></aside>
@@ -110,12 +118,12 @@
 
     <div id="toast" aria-live="polite"></div>
 
-    <script src="toast.js"></script>
-    <script src="theme.js"></script>
-    <script src="bg.js"></script>
-    <script src="motion-loader.js"></script>
+    <script src="/toast.js"></script>
+    <script src="/theme.js"></script>
+    <script src="/bg.js"></script>
+    <script src="/motion-loader.js"></script>
     <script>window.__motion = null; loadMotion().then(m => window.__motion = m);</script>
-    <script src="transitions.js"></script>
+    <script src="/transitions.js"></script>
     <script>
         let tools = [];
         let current = null;
@@ -193,6 +201,32 @@
                 b.addEventListener('click', () => openTool(Number(b.dataset.id))));
         }
 
+        async function loadStats() {
+            try {
+                const [stale, act] = await Promise.all([
+                    fetch('/api/admin/stale', { credentials: 'same-origin' }).then(r => r.json()),
+                    fetch('/api/admin/activity', { credentials: 'same-origin' }).then(r => r.json()),
+                ]);
+
+                const tools = stale.tools || [];
+                const days = tools.map(t => Math.floor((Date.now() - new Date(t.verifiedAt || Date.now())) / 86400000));
+                const staleCount = days.filter(d => d > 30).length;
+                const lastWeek = (act.activity || []).filter(a => Date.now() - new Date(a.created_at) < 7 * 86400000).length;
+                const authors = new Set((act.activity || []).map(a => a.username).filter(Boolean));
+
+                el('stats').innerHTML = [
+                    ['инструментов', tools.length],
+                    ['ждут проверки', staleCount],
+                    ['правок за неделю', lastWeek],
+                    ['кто правил', authors.size || '—'],
+                ].map(([label, value]) => `
+                    <div class="stat">
+                        <b>${value}</b>
+                        <span class="m-label">${label}</span>
+                    </div>`).join('');
+            } catch { /* статистика не критична */ }
+        }
+
         async function load() {
             const res = await fetch('/api/admin/stale', { credentials: 'same-origin' });
             if (!res.ok) {
@@ -209,6 +243,7 @@
             el('work').hidden = false;
             drawList();
             openTool(tools[0].id);
+            loadStats();
         }
 
         el('saveBtn').addEventListener('click', async () => {

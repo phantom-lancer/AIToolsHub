@@ -60,7 +60,7 @@
                 label: t.name,
                 hint: `${t.category} · ★ ${t.rating}`,
                 icon: t.name[0],
-                go: () => go('tool.html?id=' + t.id),
+                go: () => go('/tool/' + t.id),
             }));
         return [...pages, ...listTools];
     }

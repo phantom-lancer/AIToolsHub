@@ -62,7 +62,7 @@ function render() {
         : (b.userAvg ?? b.rating) - (a.userAvg ?? a.rating));
 
     grid.innerHTML = filtered.map(t => `
-        <div class="item" data-id="${t.id}">
+        <div class="item" data-id="${t.id}" data-name="${t.name}">
             <span class="cover" data-cover="${t.domain}"></span>
             <span class="cover-fallback" style="background:${coverGradients[t.category]}"></span>
             <label class="mark" title="Добавить к сравнению">
@@ -73,11 +73,13 @@ function render() {
                     <span class="mark-tick" hidden>✓</span>
                 </span>
             </label>
-            <a class="name-link" href="tool.html?id=${t.id}">
+            <a class="name-link" href="/tool/${t.id}">
                 <span class="name">${t.name}</span>
                 <span class="host">${t.domain}</span>
+                <span class="item-tags">${(t.tags || []).slice(0, 3).map(x => `<i>${x}</i>`).join('')}<span class="live" hidden></span></span>
             </a>
             <span class="desc">${t.desc}</span>
+            <span class="limits" title="${t.limits}">${t.limits}</span>
             <span class="pill">${paymentLabels[t.payment]}</span>
             <span class="pill ${t.vpn === 'Без VPN' ? 'ok' : 'bad'}">${t.vpn}</span>
             <span class="rate"><b>${(t.userAvg ?? t.rating).toFixed(1)}</b> · ${t.ratingsCount ?? 0}</span>
@@ -283,10 +285,10 @@ document.getElementById('registerForm').addEventListener('submit', async e => {
 });
 
 /* ---------- случайный инструмент ---------- */
-document.getElementById('luckyBtn').addEventListener('click', async () => {
+document.getElementById('luckyBtn')?.addEventListener('click', async () => {
     const { tools: all } = await api('/api/tools');
     const t = all[Math.floor(Math.random() * all.length)];
-    location.href = 'tool.html?id=' + t.id;
+    location.href = '/tool/' + t.id;
 });
 
 /* =========================================================
@@ -388,7 +390,7 @@ async function showQuizResult() {
     document.getElementById('quizBody').innerHTML = `
         <div class="quiz-res">
             ${top.map(({ t, why }) => `
-                <a class="quiz-pick" href="tool.html?id=${t.id}">
+                <a class="quiz-pick" href="/tool/${t.id}">
                     <span class="em" aria-hidden="true">${(categoryLabels[t.category] || 'AI')[0]}</span>
                     <span class="txt">
                         <b>${t.name}</b>
@@ -436,7 +438,7 @@ addEventListener('keydown', e => {
 
 /* ---------- нижняя навигация: подсветка активного раздела ---------- */
 const tabbarLinks = [...document.querySelectorAll('.tabbar a')];
-const sectionIds = ['catalog', 'daily', 'community'];
+const sectionIds = ['catalog', 'calc', 'daily', 'community'];
 
 if (tabbarLinks.length && 'IntersectionObserver' in window) {
     const markActive = id => {
@@ -514,7 +516,7 @@ document.getElementById('buildBtn').addEventListener('click', async () => {
             <div class="pick">
                 <span class="pill">${paymentLabels[t.payment]}</span>
                 <span><b>${t.name}</b> <span class="host">${t.domain}</span></span>
-                <a class="btn" style="height:34px;padding:0 15px;font-size:14px" href="tool.html?id=${t.id}">Открыть</a>
+                <a class="btn" style="height:34px;padding:0 15px;font-size:14px" href="/tool/${t.id}">Открыть</a>
             </div>`).join('')}
         <p class="prompt" id="promptText"></p>
         <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap">
@@ -543,48 +545,52 @@ document.getElementById('buildBtn').addEventListener('click', async () => {
 
 /* ---------- live radar ---------- */
 const statusNote = {
-    operational: 'API отвечает в норме. Замер — обычный запрос к серверу провайдера.',
+    operational: 'Отвечает в норме. Замер — обычный запрос к сайту сервиса.',
     degraded: 'Отвечает, но заметно медленнее обычного. Бывает в часы пик.',
     down: 'Запрос не прошёл: сервер не ответил или вернул ошибку 5xx.',
+    blocked: 'Маршрут закрыт — сервис не отвечает без VPN. Это не поломка, а блокировка.',
     unknown: 'Замер ещё не выполнен, данных пока нет.',
 };
+const statusLabel = s => s === 'operational' ? 'Работает'
+    : s === 'degraded' ? 'Замедлен'
+        : s === 'down' ? 'Недоступен'
+            : s === 'blocked' ? 'Нужен VPN' : 'Нет данных';
 // timeout ≠ сервис упал: это почти всегда режет маршрут провайдера
 const statusReason = s => s.error === 'timeout'
     ? 'Сервер не успел ответить за 8 секунд. Чаще всего это не поломка сервиса, а блокировка маршрута вашим провайдером.'
     : s.error === 'unreachable'
         ? 'Соединение не установилось — DNS или сеть до этого адреса не пускает.'
         : '';
-const statusLabel = s => s === 'operational' ? 'Работает'
-    : s === 'degraded' ? 'Замедлен'
-        : s === 'down' ? 'Недоступен' : 'Нет данных';
 
 async function loadRadar() {
     const box = document.getElementById('radarBox');
     try {
-        const { services, summary, method } = await api('/api/radar');
+        const { services, tools: toolStatus, summary, method } = await api('/api/radar');
         const openIdx = [...box.querySelectorAll('.svc')].findIndex(r => r.classList.contains('open'));
 
         const overall = summary.down ? 'bad' : summary.degraded ? 'warn' : '';
         const headline = summary.total
             ? (summary.down
                 ? `${summary.down} из ${summary.total} сервисов сейчас не отвечают`
-                : summary.degraded
-                    ? `все ${summary.total} отвечают, но ${summary.degraded} медленнее обычного`
+                : summary.blocked
+                    ? `${summary.total - summary.blocked} из ${summary.total} отвечают, ещё ${summary.blocked} закрыты маршрутом`
+                    : summary.degraded
+                        ? `все ${summary.total} отвечают, но ${summary.degraded} медленнее обычного`
                     : `все ${summary.total} сервисов отвечают в норме`)
             : 'идёт первый замер';
 
         box.innerHTML = `
             <header>
-                <span class="m-label">статус API-провайдеров</span>
+                <span class="m-label">статус сервисов каталога</span>
                 <span class="m-label right">${method || ''}</span>
             </header>
             <p class="radar-head">
                 <span class="dot ${overall}"></span>
                 <b>${headline}</b>
             </p>` +
-            services.map(s => `
+            toolStatus.map(s => `
                 <div class="svc" tabindex="0" role="button" aria-expanded="false">
-                    <span class="dot ${s.status === 'degraded' ? 'warn' : s.status === 'down' ? 'bad' : ''}"></span>
+                    <span class="dot ${s.status === 'degraded' ? 'warn' : s.status === 'down' ? 'bad' : s.status === 'blocked' ? 'warn' : ''}"></span>
                     <b>${s.name}</b>
                     <span class="st">${statusLabel(s.status)}</span>
                     <span class="up">${s.uptime24h !== null ? 'аптайм ' + s.uptime24h + '%' : '—'}</span>
@@ -615,8 +621,20 @@ async function loadRadar() {
                 if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); }
             });
         });
+
+        // Статус подставляется в строки каталога
+        const map = new Map(toolStatus.map(s => [s.name, s.status]));
+        document.querySelectorAll('.item[data-name]').forEach(el => {
+            const st = map.get(el.dataset.name);
+            if (!st) return;
+            const badge = el.querySelector('.live');
+            if (!badge) return;
+            badge.hidden = false;
+            badge.className = 'live ' + (st === 'operational' ? '' : st === 'down' ? 'bad' : 'warn');
+            badge.textContent = statusLabel(st);
+        });
     } catch {
-        box.innerHTML = '<header><span class="m-label">статус API-провайдеров</span></header>'
+        box.innerHTML = '<header><span class="m-label">статус сервисов каталога</span></header>'
             + '<p class="radar-head"><b>Не удалось загрузить статус. Обновите страницу.</b></p>';
     }
 }
@@ -667,12 +685,12 @@ async function loadDaily() {
         box.innerHTML = `
             <div>
                 <p class="day-num">${since.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })}</p>
-                <h3><a href="tool.html?id=${tool.id}">${tool.name}</a></h3>
+                <h3><a href="/tool/${tool.id}">${tool.name}</a></h3>
                 <p>${tool.desc}</p>
                 <p class="prompt">${prompt}</p>
             </div>
             <div style="display:grid;gap:10px">
-                <a class="btn" href="tool.html?id=${tool.id}">Открыть</a>
+                <a class="btn" href="/tool/${tool.id}">Открыть</a>
                 <button class="btn primary" id="dailyFav">В избранное</button>
             </div>`;
         document.getElementById('dailyFav').addEventListener('click', async () => {
@@ -681,6 +699,70 @@ async function loadDaily() {
         });
     } catch { }
 }
+
+/* ---------- калькулятор стоимости ---------- */
+const calcWork = document.getElementById('calcWork');
+const calcVolume = document.getElementById('calcVolume');
+const calcFree = document.getElementById('calcFree');
+const calcVpn = document.getElementById('calcVpn');
+const calcOut = document.getElementById('calcOut');
+let calcPeriod = 'month';
+
+async function runCalc() {
+    if (!calcOut) return;
+    calcOut.innerHTML = '<p class="m-label">Считаю…</p>';
+    try {
+        const data = await api('/api/calc', {
+            method: 'POST',
+            body: JSON.stringify({
+                volume: Number(calcVolume.value) || 100,
+                work: calcWork.value,
+                period: calcPeriod,
+                freeOnly: calcFree.checked,
+                noVpn: calcVpn.checked,
+            }),
+        });
+
+        if (!data.rows.length) {
+            calcOut.innerHTML = '<p class="m-label">Под эти условия не подошёл ни один сервис. Снимите фильтры.</p>';
+            return;
+        }
+
+        const best = data.best;
+        const when = data.period === 'day' ? 'в день' : 'в месяц';
+        calcOut.innerHTML = `
+            <div class="calc-summary">
+                <p class="m-label">${data.label} ${when}</p>
+                <b>${data.volume.toLocaleString('ru-RU')} ${data.unit}</b>
+                <p>${data.freeCount} из ${data.rows.length} сервисов справятся бесплатно</p>
+                ${best ? `<p class="calc-best">Дешевле всего: <b>${best.name}</b> — ${best.verdict}</p>` : ''}
+            </div>
+            <div class="calc-rows">
+                ${data.rows.map(r => `
+                    <a class="calc-row${r.fits ? ' is-free' : ''}" href="/tool/${r.id}">
+                        <b>${r.name}</b>
+                        <span class="calc-free">${r.freeLabel || '—'}</span>
+                        <span class="calc-cost ${r.cost === 0 ? 'ok' : ''}">${r.verdict}</span>
+                    </a>`).join('')}
+            </div>`;
+    } catch {
+        calcOut.innerHTML = '<p class="m-label">Не удалось посчитать. Обновите страницу.</p>';
+    }
+}
+
+document.querySelectorAll('[data-period]').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('[data-period]').forEach(b => b.classList.toggle('is-on', b === btn));
+        calcPeriod = btn.dataset.period;
+        if (calcPeriod === 'day' && Number(calcVolume.value) > 500) calcVolume.value = 100;
+        if (calcPeriod === 'month' && Number(calcVolume.value) < 50) calcVolume.value = 500;
+        runCalc();
+    });
+});
+
+[calcWork, calcVolume, calcFree, calcVpn].forEach(el => el && el.addEventListener('input', runCalc));
+[calcWork, calcVolume].forEach(el => el && el.addEventListener('change', runCalc));
+runCalc();
 
 /* ---------- подборки сообщества ---------- */
 async function loadCommunity() {
@@ -692,11 +774,12 @@ async function loadCommunity() {
             <article class="stack-card">
                 <span class="m-label">${s.task}</span>
                 <h3>${s.name}</h3>
-                <div class="tools">${s.tools.map(t => `<span>${t.name}</span>`).join('')}</div>
+                ${s.note ? `<p class="stack-note">${s.note}</p>` : ''}
+                <div class="tools">${s.tools.map(t => `<a href="/tool/${t.id}">${t.name}</a>`).join('')}</div>
                 <div class="foot">
-                    <span class="author">${s.author} · ${s.likes} ♥</span>
+                    <span class="author">${s.author}</span>
                     <span style="flex:1"></span>
-                    <button class="btn" data-apply="${s.id}" style="height:34px;padding:0 14px;font-size:14px">Применить</button>
+                    <button class="btn" data-apply="${s.id}" style="height:34px;padding:0 14px;font-size:14px">В мой стек</button>
                 </div>
             </article>`).join('');
 
