@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="ru" data-mode="auto">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#eef0f4">
+    <title>Промпты для ИИ — AI Tools Hub</title>
+    <meta name="description" content="Рабочие шаблоны промптов для текста, кода, графики, видео, звука и 3D. Копируются в один клик.">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="/icon-192.png">
+    <link rel="manifest" href="/manifest.json">
+    <script>
+      (function(){var r=document.documentElement;try{var m=localStorage.getItem('theme')||'auto';
+      var d=m==='dark'||(m==='auto'&&matchMedia('(prefers-color-scheme: dark)').matches);
+      r.dataset.mode=m;r.dataset.theme=d?'dark':'light';
+      var t=document.querySelector('meta[name="theme-color"]');if(t)t.content=d?'#0d0f13':'#eef0f4';}catch(e){}})();
+    </script>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <header class="topbar glass">
+        <a class="brand" href="/index.html"><span class="dotmark">AI</span>AI Tools Hub</a>
+        <nav class="mainnav">
+            <a href="/index.html#catalog">Каталог</a>
+            <a href="/index.html#calc">Калькулятор</a>
+            <a href="/prompts.html">Промпты</a>
+            <a href="/compare.html">Сравнение</a>
+        </nav>
+        <span class="sp"></span>
+        <button class="theme-toggle" aria-label="Сменить тему">
+            <svg class="i-auto" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.6"/><path d="M12 3.4a8.6 8.6 0 0 1 0 17.2Z" fill="currentColor" stroke="none"/></svg>
+            <svg class="i-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.6v2.2M12 19.2v2.2M2.6 12h2.2M19.2 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6"/></svg>
+            <svg class="i-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 13.2A8.6 8.6 0 0 1 10.8 3a8.6 8.6 0 1 0 10.2 10.2Z"/></svg>
+        </button>
+        <a class="btn" href="/index.html">К каталогу</a>
+    </header>
+
+    <main class="wrap section" style="padding-top:120px">
+        <div class="sec-head">
+            <p class="m-label">библиотека</p>
+            <h1>Промпты, которые работают</h1>
+            <p>Шаблоны с явной структурой: что сказать, в каком порядке и что получить на выходе.
+                Пустые места в квадратных скобках заменяете на своё, копируете и вставляете в чат.</p>
+        </div>
+
+        <div class="prompts-bar">
+            <input class="search" type="text" id="promptSearch" placeholder="Поиск по промптам: рефакторинг, презентация, сценарий…">
+            <div class="tabs" id="promptCats" role="group" aria-label="Категории"></div>
+        </div>
+
+        <div class="prompts-list" id="promptList"></div>
+    </main>
+
+    <div id="toast" aria-live="polite"></div>
+
+    <script src="/toast.js"></script>
+    <script src="/theme.js"></script>
+    <script src="/bg.js"></script>
+    <script src="/motion-loader.js"></script>
+    <script>window.__motion = null; loadMotion().then(m => window.__motion = m);</script>
+    <script src="/transitions.js"></script>
+    <script src="/palette.js"></script>
+    <script>
+        const CAT_LABEL = {
+            text: 'Текст', code: 'Код', art: 'Графика',
+            video: 'Видео', audio: 'Звук', '3d': '3D',
+        };
+        const list = document.getElementById('promptList');
+        const cats = document.getElementById('promptCats');
+        const search = document.getElementById('promptSearch');
+
+        let all = [];
+        let activeCat = 'all';
+
+        function draw() {
+            const q = search.value.trim().toLowerCase();
+            const rows = all.filter(p => {
+                if (activeCat !== 'all' && p.category !== activeCat) return false;
+                if (!q) return true;
+                return (p.title + ' ' + p.body + ' ' + (p.tool_name || '')).toLowerCase().includes(q);
+            });
+
+            list.innerHTML = rows.length ? rows.map(p => `
+                <article class="prompt-card">
+                    <header>
+                        <span class="pill">${CAT_LABEL[p.category] || p.category}</span>
+                        ${p.tool_name ? `<a class="prompt-tool" href="/tool/${p.tool_id}">${p.tool_name}</a>` : ''}
+                        <span class="sp" style="flex:1"></span>
+                        <span class="m-label">${p.copies} ${p.copies === 1 ? 'копия' : 'копий'}</span>
+                    </header>
+                    <h2>${p.title}</h2>
+                    <pre>${p.body.replace(/</g, '&lt;')}</pre>
+                    <div class="prompt-foot">
+                        <button class="btn" data-copy="${p.id}">Скопировать</button>
+                        <span class="m-label">замените [квадратные скобки] на своё</span>
+                    </div>
+                </article>`).join('')
+                : '<p class="empty">Ничего не нашлось. Попробуйте другой запрос.</p>';
+        }
+
+        async function load() {
+            list.innerHTML = '<p class="m-label">Загружаю…</p>';
+            const res = await fetch('/api/prompts');
+            const data = await res.json();
+            all = data.prompts || [];
+
+            cats.innerHTML = ['all', ...data.categories].map(c => `
+                <button aria-pressed="${c === 'all'}" data-cat="${c}">
+                    ${c === 'all' ? 'Все' : (CAT_LABEL[c] || c)}
+                </button>`).join('');
+            cats.querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
+                activeCat = b.dataset.cat;
+                cats.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+                draw();
+            }));
+
+            draw();
+        }
+
+        list.addEventListener('click', async e => {
+            const btn = e.target.closest('[data-copy]');
+            if (!btn) return;
+            const p = all.find(x => x.id === Number(btn.dataset.copy));
+            if (!p) return;
+            try {
+                await navigator.clipboard.writeText(p.body);
+            } catch {
+                const ta = document.createElement('textarea');
+                ta.value = p.body;
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                ta.remove();
+            }
+            p.copies = (p.copies || 0) + 1;
+            btn.textContent = 'Скопировано';
+            setTimeout(() => { btn.textContent = 'Скопировать'; }, 1400);
+            showToast('Промпт в буфере обмена');
+            fetch('/api/prompts/' + p.id + '/copy', { method: 'POST' });
+        });
+
+        search.addEventListener('input', draw);
+        load();
+    </script>
+</body>
+</html>

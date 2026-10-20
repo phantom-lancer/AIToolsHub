@@ -31,6 +31,7 @@
             <a href="#radar">Статус</a>
             <a href="#builder">Стек-билдер</a>
             <a href="compare.html">Сравнение</a>
+            <a href="prompts.html">Промпты</a>
         </nav>
         <span class="sp"></span>
         <button class="btn quiet" data-open-cmd title="Командная палитра — ⌘K">
@@ -50,7 +51,7 @@
 
     <main id="top">
         <section class="wrap hero">
-            <span class="badge glass"><span class="pulse"></span>24 сервиса · лимиты и цены в цифрах · статус проверяется каждые 5 минут</span>
+            <span class="badge glass" id="heroBadge"><span class="pulse"></span>40 сервисов · лимиты и цены в цифрах · статус проверяется каждые 5 минут</span>
             <h1>Посчитай, во сколько обойдётся твоя работа с нейросетями</h1>
             <p class="lead">Введи объём — увидишь, какие сервисы укладываются в бесплатный лимит, а где придётся платить. По каждому видно, сколько выдают на самом деле, нужен ли VPN и что изменилось у провайдера за последние месяцы.</p>
             <div class="actions">
@@ -142,11 +143,12 @@
 
         <section class="wrap section" id="daily">
             <div class="sec-head">
-                <p class="m-label">инструмент дня</p>
-                <h2>Попробуйте сегодня</h2>
-                <p>Один инструмент и готовая подсказка — каждый день новый.</p>
+                <p class="m-label">что изменилось</p>
+                <h2>История условий провайдеров</h2>
+                <p>Лимиты режут, цены поднимают, доступ закрывают. Здесь — что именно менялось и когда. Дальше эта история пополняется автоматически.</p>
             </div>
-            <div class="panel glass daily" id="dailyBox"></div>
+            <div class="panel glass changes" id="changesBox"></div>
+            <div class="panel glass daily" id="dailyBox" style="margin-top:14px"></div>
         </section>
 
         <section class="wrap section" id="calc">
@@ -261,6 +263,10 @@
         <a href="compare.html">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 7h10M4 12h16M4 17h7"/><path d="m14 4 3 3-3 3M10 14l-3 3 3 3"/></svg>
             Сравнить
+        </a>
+        <a href="prompts.html">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M5 4h9l5 5v11a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1Z"/><path d="M14 4v5h5M8 13h8M8 17h5"/></svg>
+            Промпты
         </a>
         <a href="profile.html">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="8.4" r="3.8"/><path d="M4.8 20c.7-3.8 3.4-5.8 7.2-5.8s6.5 2 7.2 5.8"/></svg>

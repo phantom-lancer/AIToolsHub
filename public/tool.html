@@ -66,6 +66,11 @@
         const pathMatch = location.pathname.match(/\/tool\/(\d+)/);
         const id = pathMatch ? pathMatch[1] : new URLSearchParams(location.search).get('id');
         let myRating = 0;
+        let myUserId = null;
+        fetch('/api/me', { credentials: 'same-origin' })
+            .then(r => r.ok ? r.json() : null)
+            .then(d => { if (d && d.user) myUserId = d.user.id; })
+            .catch(() => { });
         let allTools = [];
 
         async function loadAll() {
@@ -492,6 +497,7 @@
                         <div style="min-width:0">
                             <b>${c.username}</b>
                             <span class="host">${new Date(c.created_at).toLocaleString('ru-RU')}</span>
+                            ${myUserId === c.userId ? `<button class="cmt-del" data-del="${c.id}" title="Удалить свой комментарий">×</button>` : ''}
                             <p style="margin-top:4px">${c.text.replace(/</g, '&lt;')}</p>
                             <div class="cmt-actions">
                                 <button class="cmt-btn${c.liked ? ' liked' : ''}" data-like="${c.id}">♥ ${c.likes || ''}</button>
@@ -512,6 +518,19 @@
             }));
 
             page.addEventListener('click', async e => {
+                const del = e.target.closest('[data-del]');
+                if (del) {
+                    const cid = Number(del.dataset.del);
+                    if (!confirm('Удалить комментарий? Это нельзя отменить.')) return;
+                    const res = await fetch(`/api/comments/${cid}`, { method: 'DELETE', credentials: 'same-origin' });
+                    const data = await res.json();
+                    if (!res.ok) { showToast(data.error || 'Не удалось удалить'); return; }
+                    comments = comments.filter(x => x.id !== cid);
+                    renderComments();
+                    showToast('Комментарий удалён');
+                    return;
+                }
+
                 const like = e.target.closest('[data-like]');
                 if (like) {
                     const cid = Number(like.dataset.like);

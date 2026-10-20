@@ -153,7 +153,7 @@ html[data-theme="dark"] .glass.lit::after{
   width:22px;height:22px;border-radius:8px;display:grid;place-items:center;
   background:linear-gradient(160deg,var(--accent),var(--accent-2));color:#fff;font-size:12px;font-weight:700;
 }
-.mainnav{display:flex;gap:2px;margin-left:6px}
+.mainnav{display:flex;gap:2px;margin-left:6px;align-items:center;white-space:nowrap}
 .mainnav a{
   color:var(--fg-2);font-size:14.5px;padding:8px 13px;border-radius:14px;
   transition:color .22s var(--ease),background-color .22s var(--ease);
@@ -196,6 +196,15 @@ html[data-mode="light"] .theme-toggle .i-sun{display:block}
 html[data-mode="dark"] .theme-toggle .i-moon{display:block}
 
 /* ================= HERO ================= */
+.mainnav a{white-space:nowrap}
+.brand{white-space:nowrap}
+@media (max-width:1180px){
+  .topbar .mainnav a[href="#builder"]{display:none}
+}
+@media (max-width:1040px){
+  .topbar .mainnav a[href="#radar"]{display:none}
+}
+
 .hero{padding:136px 0 40px;text-align:center}
 .hero .badge{
   display:inline-flex;align-items:center;gap:9px;padding:8px 16px;border-radius:999px;
@@ -980,6 +989,61 @@ html.nav-enter,html.nav-pop{overflow-x:hidden}
   .budget-row .m-label{grid-column:1 / -1;grid-row:2}
   .watch-row{grid-template-columns:1fr auto;gap:4px}
   .watch-row .m-label{grid-column:1 / -1}
+}
+
+.cmt-del{
+  float:right;width:22px;height:22px;border-radius:50%;font-size:15px;line-height:1;
+  color:var(--fg-3);cursor:pointer;transition:color .18s var(--ease),background-color .18s var(--ease);
+}
+.cmt-del:hover{color:var(--bad);background:var(--glass-3)}
+
+/* ================= ЛЕНТА ИЗМЕНЕНИЙ ================= */
+.changes{padding:22px}
+.ch-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+.ch-head b{font-family:var(--mono);font-size:22px;font-weight:600}
+.ch-list{display:grid;gap:14px}
+.ch-day{display:grid;gap:6px}
+.ch-date{padding-left:2px}
+.ch-row{
+  display:grid;grid-template-columns:minmax(120px,.7fr) 120px minmax(0,1.6fr);gap:12px;align-items:center;
+  padding:10px 13px;border-radius:12px;background:var(--glass-1);
+  transition:background-color .18s var(--ease);
+}
+.ch-row:hover{background:var(--glass-3)}
+.ch-row b{font-size:14.5px;font-weight:550}
+.ch-row:hover b{color:var(--accent)}
+.ch-change{font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ch-change s{color:var(--fg-3)}
+.ch-change b{color:var(--ok);font-weight:550}
+@media (max-width:680px){
+  .ch-row{grid-template-columns:1fr auto;gap:4px}
+  .ch-row .m-label{grid-column:1 / -1;grid-row:2}
+  .ch-change{grid-column:1 / -1;grid-row:3;white-space:normal}
+}
+
+/* ================= ПРОМПТЫ ================= */
+.prompts-bar{display:grid;gap:14px;margin-bottom:20px}
+.prompts-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px}
+.prompt-card{
+  display:flex;flex-direction:column;gap:10px;padding:20px;border-radius:var(--r-lg);
+  background:linear-gradient(180deg,var(--glass-1),var(--glass-2));
+  box-shadow:var(--sh-1),inset 0 1px 0 var(--hair);
+  transition:transform .35s var(--spring);
+}
+.prompt-card:hover{transform:translateY(-3px)}
+.prompt-card header{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.prompt-tool{font-size:12.5px;color:var(--fg-3);font-family:var(--mono)}
+.prompt-tool:hover{color:var(--accent)}
+.prompt-card h2{font-size:17px;font-weight:600;line-height:1.3}
+.prompt-card pre{
+  margin:0;padding:13px 15px;border-radius:13px;font-family:var(--mono);font-size:13px;line-height:1.6;
+  background:var(--glass-3);color:var(--fg-2);white-space:pre-wrap;word-break:break-word;
+  flex:1;
+}
+.prompt-foot{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.prompt-foot .btn{height:34px;padding:0 15px;font-size:14px}
+@media (max-width:680px){
+  .prompts-list{grid-template-columns:1fr}
 }
 
 /* ================= АДАПТИВ ================= */

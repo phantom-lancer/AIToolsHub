@@ -35,6 +35,8 @@
 
     const ACTIONS = [
         { group: 'Навигация', label: 'Каталог', hint: 'все инструменты', icon: '◎', go: () => go('index.html#catalog') },
+        { group: 'Навигация', label: 'Калькулятор', hint: 'сколько стоит', icon: '∑', go: () => go('index.html#calc') },
+        { group: 'Навигация', label: 'Промпты', hint: 'библиотека шаблонов', icon: '❝', go: () => go('prompts.html') },
         { group: 'Навигация', label: 'Статус сервисов', hint: 'radar', icon: '◉', go: () => go('index.html#radar') },
         { group: 'Навигация', label: 'Стек-билдер', hint: 'подобрать стек', icon: '⬗', go: () => go('index.html#builder') },
         { group: 'Навигация', label: 'Сравнение', hint: 'две нейросети', icon: '⇄', go: () => go('compare.html') },

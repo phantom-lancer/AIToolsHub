@@ -110,6 +110,15 @@ db.exec(`
         text TEXT NOT NULL,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP
     );
+        CREATE TABLE IF NOT EXISTS prompts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        tool_id INTEGER,
+        category TEXT NOT NULL,
+        title TEXT NOT NULL,
+        body TEXT NOT NULL,
+        copies INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    );
     CREATE TABLE IF NOT EXISTS fact_reports (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         tool_id INTEGER NOT NULL,
@@ -529,7 +538,7 @@ app.get('/api/tools/:id', (req, res) => {
     const r = db.prepare('SELECT COUNT(*) as n, AVG(value) as avg FROM ratings WHERE tool_id = ?').get(tool.id);
     const viewer = getUser(req);
     const rawComments = db.prepare(`
-        SELECT c.id, c.text, c.created_at, u.username, u.avatar
+        SELECT c.id, c.user_id, c.text, c.created_at, u.username, u.avatar
         FROM comments c JOIN users u ON u.id = c.user_id
         WHERE c.tool_id = ? ORDER BY c.id DESC
     `).all(tool.id);
@@ -816,7 +825,78 @@ app.get('/api/radar', (req, res) => {
     });
 });
 
-// ---------- калькулятор стоимости ----------
+// ---------- промпт-библиотека ----------
+const { PROMPTS } = require('./prompts');
+
+if (!db.prepare('SELECT COUNT(*) AS n FROM prompts').get().n) {
+    const insert = db.prepare('INSERT INTO prompts (tool_id, category, title, body) VALUES (?, ?, ?, ?)');
+    for (const p of PROMPTS) insert.run(p.tool || null, p.cat, p.title, p.body);
+    console.log(`[prompts] загружено: ${PROMPTS.length}`);
+}
+
+app.get('/api/prompts', (req, res) => {
+    const q = String(req.query.q || '').trim().toLowerCase();
+    const cat = String(req.query.cat || '').trim();
+    const rows = db.prepare(`
+        SELECT p.id, p.tool_id, p.category, p.title, p.body, p.copies, t.name AS tool_name
+        FROM prompts p LEFT JOIN tools t ON t.id = p.tool_id
+        ORDER BY p.copies DESC, p.id ASC
+    `).all();
+
+    const list = rows.filter(p => {
+        if (cat && p.category !== cat) return false;
+        if (!q) return true;
+        return (p.title + ' ' + p.body + ' ' + (p.tool_name || '')).toLowerCase().includes(q);
+    });
+
+    res.json({
+        prompts: list,
+        categories: [...new Set(rows.map(p => p.category))],
+        total: rows.length,
+    });
+});
+
+app.post('/api/prompts/:id/copy', (req, res) => {
+    const id = Number(req.params.id);
+    if (!db.prepare('SELECT id FROM prompts WHERE id = ?').get(id)) {
+        return res.status(404).json({ error: 'Не найдено' });
+    }
+    db.prepare('UPDATE prompts SET copies = copies + 1 WHERE id = ?').run(id);
+    res.json({ ok: true });
+});
+
+// ---------- лента изменений ----------
+// Что поменялось у провайдеров. Показываем последние изменения с их
+// настоящими датами и отдельно считаем, сколько пришлось на последний месяц.
+app.get('/api/changes', (req, res) => {
+    const days = Math.max(1, Math.min(365, Number(req.query.days) || 30));
+    const since = new Date(Date.now() - days * 86400000).toISOString();
+
+    const rows = db.prepare(`
+        SELECT c.id, c.field, c.old_value, c.new_value, c.note, c.created_at, t.id AS tool_id, t.name AS tool_name
+        FROM tool_changes c JOIN tools t ON t.id = c.tool_id
+        ORDER BY c.created_at DESC, c.id DESC
+        LIMIT 40
+    `).all();
+
+    const recentCount = db.prepare('SELECT COUNT(*) as n FROM tool_changes WHERE created_at >= ?').get(since).n;
+
+    const byDay = new Map();
+    rows.forEach(r => {
+        const day = String(r.created_at).slice(0, 10);
+        if (!byDay.has(day)) byDay.set(day, []);
+        byDay.get(day).push(r);
+    });
+
+    res.json({
+        days,
+        total: rows.length,
+        recentCount,
+        lastChange: rows[0] ? rows[0].created_at : null,
+        recent: rows.slice(0, 8),
+        timeline: [...byDay].slice(0, 10).map(([day, items]) => ({ day, items })),
+    });
+});
 // Считает, во сколько обойдётся объём работы на платных тарифах.
 // Считаем по объёму: из месячного лимита вычитаем бесплатный,
 // остаток оплачивается по цене месяца.
@@ -1309,6 +1389,48 @@ app.get('/api/admin/stale', requireAdmin, (req, res) => {
         ORDER BY COALESCE(verified_at, '2000-01-01') ASC
     `).all();
     res.json({ tools: rows.map(rowToTool) });
+});
+
+// Удаление и редактирование своих комментариев
+app.delete('/api/comments/:id', requireAuth, (req, res) => {
+    const id = Number(req.params.id);
+    const c = db.prepare('SELECT id, user_id FROM comments WHERE id = ?').get(id);
+    if (!c) return res.status(404).json({ error: 'Не найдено' });
+    if (c.user_id !== req.user.id && !isAdminUser(req.user.id)) {
+        return res.status(403).json({ error: 'Можно удалять только свои комментарии' });
+    }
+    db.prepare('DELETE FROM comment_replies WHERE comment_id = ?').run(id);
+    db.prepare('DELETE FROM comment_likes WHERE comment_id = ?').run(id);
+    db.prepare('DELETE FROM comments WHERE id = ?').run(id);
+    res.json({ ok: true });
+});
+
+app.patch('/api/comments/:id', requireAuth, (req, res) => {
+    const id = Number(req.params.id);
+    const c = db.prepare('SELECT id, user_id FROM comments WHERE id = ?').get(id);
+    if (!c) return res.status(404).json({ error: 'Не найдено' });
+    if (c.user_id !== req.user.id) {
+        return res.status(403).json({ error: 'Можно править только свои комментарии' });
+    }
+    const text = String(req.body?.text || '').trim();
+    if (text.length < 2 || text.length > 500) {
+        return res.status(400).json({ error: 'Комментарий 2–500 символов' });
+    }
+    db.prepare('UPDATE comments SET text = ? WHERE id = ?').run(text, id);
+    res.json({ ok: true, text });
+});
+
+// Удаление своего факт-чека
+app.delete('/api/reports/:id', requireAuth, (req, res) => {
+    const id = Number(req.params.id);
+    const r = db.prepare('SELECT id, user_id FROM fact_reports WHERE id = ?').get(id);
+    if (!r) return res.status(404).json({ error: 'Не найдено' });
+    if (r.user_id !== req.user.id && !isAdminUser(req.user.id)) {
+        return res.status(403).json({ error: 'Можно удалять только свои наблюдения' });
+    }
+    db.prepare('DELETE FROM fact_confirms WHERE report_id = ?').run(id);
+    db.prepare('DELETE FROM fact_reports WHERE id = ?').run(id);
+    res.json({ ok: true });
 });
 
 app.post('/api/tools/:id/comment', requireAuth, (req, res) => {

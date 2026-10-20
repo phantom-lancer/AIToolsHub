@@ -764,6 +764,61 @@ document.querySelectorAll('[data-period]').forEach(btn => {
 [calcWork, calcVolume].forEach(el => el && el.addEventListener('change', runCalc));
 runCalc();
 
+/* ---------- счётчик сервисов в шапке ---------- */
+api('/api/tools').then(d => {
+    const badge = document.getElementById('heroBadge');
+    if (!badge || !d.tools) return;
+    const n = d.tools.length;
+    const word = n % 10 === 1 && n % 100 !== 11 ? 'сервис'
+        : (n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20)) ? 'сервиса' : 'сервисов';
+    badge.innerHTML = `<span class="pulse"></span>${n} ${word} · лимиты и цены в цифрах · статус проверяется каждые 5 минут`;
+}).catch(() => { });
+
+/* ---------- лента изменений ---------- */
+async function loadChanges() {
+    const box = document.getElementById('changesBox');
+    if (!box) return;
+    try {
+        const data = await api('/api/changes?days=30');
+        if (!data.total) {
+            box.innerHTML = '<p class="m-label">Изменений пока не зафиксировано — история условий только набирается.</p>';
+            return;
+        }
+        const FIELD = {
+            limits: 'Лимиты', payment: 'Оплата', vpn: 'Доступ', speed: 'Скорость',
+            desc: 'Описание', pros: 'Плюсы', cons: 'Минусы',
+            free_limit: 'Бесплатный лимит', price: 'Цена', access: 'Доступ',
+            feature: 'Возможности', name: 'Название',
+        };
+        box.innerHTML = `
+            <header class="ch-head">
+                <span class="m-label">всего записей</span>
+                <b>${data.total}</b>
+                <span class="m-label">за последние ${data.days} дней — ${data.recentCount}</span>
+                <span class="sp" style="flex:1"></span>
+                <span class="m-label">последнее: ${data.lastChange
+                    ? new Date(data.lastChange).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })
+                    : '—'}</span>
+            </header>
+            <div class="ch-list">
+                ${data.timeline.slice(0, 8).map(d => `
+                    <div class="ch-day">
+                        <span class="m-label ch-date">${new Date(d.day).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+                        ${d.items.map(i => `
+                            <a class="ch-row" href="/tool/${i.tool_id}">
+                                <b>${i.tool_name}</b>
+                                <span class="m-label">${FIELD[i.field] || i.field}</span>
+                                <span class="ch-change"><s>${i.old_value || '—'}</s> → <b>${i.new_value}</b></span>
+                            </a>`).join('')}
+                    </div>`).join('')}
+            </div>`;
+    } catch {
+        box.innerHTML = '<p class="m-label">Не удалось загрузить ленту изменений.</p>';
+    }
+}
+
+loadChanges();
+
 /* ---------- подборки сообщества ---------- */
 async function loadCommunity() {
     const box = document.getElementById('communityBox');
